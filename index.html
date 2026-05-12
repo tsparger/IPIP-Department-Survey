@@ -447,17 +447,13 @@ function renderDeptForm(d, i) {
                 </div>
                 <div class="form-group">
                     <label class="required">Location</label>
-                    <select data-req="dept-${i}" ${!d.region?'disabled':''} onchange="handleLocationChange(${i}, this.value)">
-                        <option value="">${d.region?'-- Select Location --':'-- Select Region first --'}</option>
-                        ${d.region ? getLocationsForRegion(d.region).map(loc => `<option value="${esc(loc)}" ${d.location===loc?'selected':''}>${esc(loc)}</option>`).join('') : ''}
-                    </select>
+                    <input type="text" data-req="dept-${i}" list="loc-list-${i}" value="${esc(d.location)}" ${!d.region?'disabled':''} placeholder="${d.region?'Type to search or click the arrow':'Select Region first'}" onchange="handleLocationChange(${i}, this.value)" />
+                    ${d.region ? `<datalist id="loc-list-${i}">${getLocationsForRegion(d.region).map(loc => `<option value="${esc(loc)}"></option>`).join('')}</datalist>` : ''}
                 </div>
                 <div class="form-group">
                     <label class="required">Department</label>
-                    <select data-req="dept-${i}" ${(!d.region || !d.location)?'disabled':''} onchange="handleDepartmentChange(${i}, this.value)">
-                        <option value="">${(d.region && d.location)?'-- Select Department --':'-- Select Location first --'}</option>
-                        ${(d.region && d.location) ? getDepartmentsForLocation(d.region, d.location).map(dep => `<option value="${esc(dep)}" ${d.department===dep?'selected':''}>${esc(dep)}</option>`).join('') : ''}
-                    </select>
+                    <input type="text" data-req="dept-${i}" list="dept-list-${i}" value="${esc(d.department)}" ${(!d.region || !d.location)?'disabled':''} placeholder="${(d.region && d.location)?'Type to search or click the arrow':'Select Location first'}" onchange="handleDepartmentChange(${i}, this.value)" />
+                    ${(d.region && d.location) ? `<datalist id="dept-list-${i}">${getDepartmentsForLocation(d.region, d.location).map(dep => `<option value="${esc(dep)}"></option>`).join('')}</datalist>` : ''}
                 </div>
             </div>
             <div class="form-group">
