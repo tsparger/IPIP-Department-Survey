@@ -211,7 +211,9 @@ const SURVEY_DATA = {"regions":["NCAL","SCAL"],"locations":{"NCAL":["Alameda Med
 
 <script>
 // ============ CONFIG ============
+const EMBEDDED_FLOW_URL = 'https://997e87e2062feb52af5c332a27e4b4.0d.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/ff587e61873d410a9b6af00baf0a2312/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=6nBKlVvqUmMixeFvw0HQHb01V_DNrgIpSS-37oZFE14';
 let URLS = JSON.parse(localStorage.getItem('ipip-flow-urls') || '{}');
+if (EMBEDDED_FLOW_URL) URLS.submit = EMBEDDED_FLOW_URL;
 let surveyDepts = [];
 
 function isConnected() { return !!URLS.submit; }
@@ -693,12 +695,8 @@ async function submitSurvey() {
         }
         hideLoading();
     } else {
-        // Local fallback — save to browser storage
-        const local = JSON.parse(localStorage.getItem('ipip-local-responses') || '[]');
-        local.push({ respondentName: nameVal, submittedAt: now.toISOString(), departments: data.departments });
-        localStorage.setItem('ipip-local-responses', JSON.stringify(local));
-        toast('Saved locally (no backend connected).');
-        showSuccessScreen(nameVal, now, surveyDepts.length);
+        toast('Cannot submit: survey is not configured. Please contact the survey administrator.', true);
+        document.getElementById('submit-btn').disabled = false;
     }
 }
 
