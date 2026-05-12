@@ -173,8 +173,8 @@ const SURVEY_DATA = {"regions":["NCAL","SCAL"],"locations":{"NCAL":["Alameda Med
         <div class="section-body">
             <div class="form-row">
                 <div class="form-group">
-                    <label class="required">Your Name</label>
-                    <input type="text" id="respondent-name" placeholder="Enter your full name..." />
+                    <label class="required">Your first and last name</label>
+                    <input type="text" id="respondent-name" placeholder="First Last" />
                 </div>
                 <div class="form-group">
                     <label>Submission Date/Time</label>
@@ -310,6 +310,11 @@ function sd(i, field) { return `surveyDepts[${i}]['${field}']`; }
 function onch(i, field) { return `onchange="${sd(i,field)}=this.value"`; }
 function onchk(i, field) { return `onchange="${sd(i,field)}=this.checked"`; }
 
+function handleDispLogicChange(i, value) {
+    surveyDepts[i].dispenseLogicCorrect = value;
+    if (value === 'Yes') surveyDepts[i].correctDispenseLogic = '';
+    renderSurvey();
+}
 function handleRechargeChange(i, value) {
     surveyDepts[i].performsRecharges = value;
     if (value === 'No') surveyDepts[i].requestorId = '';
@@ -317,6 +322,11 @@ function handleRechargeChange(i, value) {
 }
 function handleSharedChange(i, value) {
     surveyDepts[i].sharedInventory = value;
+    if (value === 'No') {
+        surveyDepts[i].currentLocations = '';
+        surveyDepts[i].sharedDepts = [];
+        surveyDepts[i].sharedDeptsOther = '';
+    }
     renderSurvey();
 }
 
@@ -488,12 +498,12 @@ function renderDeptForm(d, i) {
                 <div class="form-group">
                     <label class="required">Current Dispense Logic correct?</label>
                     <div class="radio-group" data-req-radio="dept-${i}" data-field="dispLogic-${i}">
-                        <label><input type="radio" name="dispLogic-${i}" value="Yes" ${d.dispenseLogicCorrect==='Yes'?'checked':''} onchange="${sd(i,'dispenseLogicCorrect')}=this.value" /> Yes</label>
-                        <label><input type="radio" name="dispLogic-${i}" value="No" ${d.dispenseLogicCorrect==='No'?'checked':''} onchange="${sd(i,'dispenseLogicCorrect')}=this.value" /> No</label>
+                        <label><input type="radio" name="dispLogic-${i}" value="Yes" ${d.dispenseLogicCorrect==='Yes'?'checked':''} onchange="handleDispLogicChange(${i},'Yes')" /> Yes</label>
+                        <label><input type="radio" name="dispLogic-${i}" value="No" ${d.dispenseLogicCorrect==='No'?'checked':''} onchange="handleDispLogicChange(${i},'No')" /> No</label>
                     </div>
                 </div>
                 <div class="form-group"><label>Enter correct Dispense Logic (if No)</label>
-                    <textarea ${onch(i,'correctDispenseLogic')} placeholder="Enter the correct dispense logic...">${esc(d.correctDispenseLogic)}</textarea>
+                    <textarea ${d.dispenseLogicCorrect==='No'?onch(i,'correctDispenseLogic'):''} class="${d.dispenseLogicCorrect==='No'?'':'disabled-field'}" ${d.dispenseLogicCorrect==='No'?'':'readonly'} placeholder="${d.dispenseLogicCorrect==='No'?'Enter the correct dispense logic...':'Select No above to enable this field'}">${esc(d.correctDispenseLogic)}</textarea>
                 </div>
             </div>
         </div>
@@ -588,8 +598,8 @@ function renderDeptForm(d, i) {
                         <div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">Select a Region and Location above first to see available departments.</div>
                     `}
                 </div>
-                <div class="form-group"><label class="required">Current Location(s) that store products</label>
-                    <textarea data-req="dept-${i}" ${onch(i,'currentLocations')} placeholder="List current locations...">${esc(d.currentLocations)}</textarea>
+                <div class="form-group"><label class="${d.sharedInventory==='Yes'?'required':''}">Current Location(s) that store products</label>
+                    <textarea ${d.sharedInventory==='Yes'?`data-req="dept-${i}"`:''} class="${d.sharedInventory==='Yes'?'':'disabled-field'}" ${d.sharedInventory==='Yes'?'':'readonly'} ${d.sharedInventory==='Yes'?onch(i,'currentLocations'):''} placeholder="${d.sharedInventory==='Yes'?'List current locations...':'Select Yes for shared inventory above to enable this field'}">${esc(d.currentLocations)}</textarea>
                 </div>
             </div>
         </div>
@@ -630,7 +640,7 @@ function toggleMulti(i, field, value, checked) {
 function validateSurvey() {
     let errors = [];
     const nameInput = document.getElementById('respondent-name');
-    if (!nameInput.value.trim()) { nameInput.classList.add('field-error'); errors.push('Your Name is required.'); }
+    if (!nameInput.value.trim()) { nameInput.classList.add('field-error'); errors.push('Your first and last name is required.'); }
     else { nameInput.classList.remove('field-error'); }
 
     surveyDepts.forEach((d, i) => {
