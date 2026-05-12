@@ -458,13 +458,13 @@ function renderDeptForm(d, i) {
             </div>
             <div class="form-group">
                 <label class="required">Specialty</label>
-                <input type="text" class="autofill-field" readonly value="${esc(d.specialty)}" placeholder="Auto-filled from selected Department" />
+                <input type="text" class="autofill-field" data-req="dept-${i}" value="${esc(d.specialty)}" ${onch(i,'specialty')} placeholder="Auto-fills from Department, or type manually" />
             </div>
             <div class="form-row-4">
-                <div class="form-group"><label class="required">Address</label><input type="text" class="autofill-field" readonly value="${esc(d.address)}" placeholder="Auto-filled" /></div>
-                <div class="form-group"><label class="required">City</label><input type="text" class="autofill-field" readonly value="${esc(d.city)}" placeholder="Auto-filled" /></div>
-                <div class="form-group"><label class="required">State</label><input type="text" class="autofill-field" readonly value="${esc(d.state)}" placeholder="Auto-filled" /></div>
-                <div class="form-group"><label class="required">Zip Code</label><input type="text" class="autofill-field" readonly value="${esc(d.zip)}" placeholder="Auto-filled" /></div>
+                <div class="form-group"><label class="required">Address</label><input type="text" class="autofill-field" data-req="dept-${i}" value="${esc(d.address)}" ${onch(i,'address')} placeholder="Auto-fills or type manually" /></div>
+                <div class="form-group"><label class="required">City</label><input type="text" class="autofill-field" data-req="dept-${i}" value="${esc(d.city)}" ${onch(i,'city')} placeholder="Auto-fills or type manually" /></div>
+                <div class="form-group"><label class="required">State</label><input type="text" class="autofill-field" data-req="dept-${i}" value="${esc(d.state)}" ${onch(i,'state')} placeholder="Auto-fills or type manually" /></div>
+                <div class="form-group"><label class="required">Zip Code</label><input type="text" class="autofill-field" data-req="dept-${i}" value="${esc(d.zip)}" ${onch(i,'zip')} placeholder="Auto-fills or type manually" /></div>
             </div>
             <div class="form-row">
                 <div class="check-row"><input type="checkbox" id="dispVal-${i}" ${d.dispenseValidated?'checked':''} ${onchk(i,'dispenseValidated')} /><label for="dispVal-${i}">Check if Department dispense info is validated</label></div>
