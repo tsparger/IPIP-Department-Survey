@@ -173,7 +173,6 @@ const SURVEY_DATA = {"regions":["NCAL","SCAL"],"locations":{"NCAL":["Alameda Med
     <div class="card" id="survey-header-card">
         <div class="flex-between mb-2">
             <h2 style="border:none;padding:0;">KP NPI IPIP - Validate KPHC Departments</h2>
-            <span class="badge badge-pending" id="survey-status-badge">Draft</span>
         </div>
         <p style="margin-bottom:16px;">Please complete the following for each department in scope. Fields marked with <span style="color:#e53e3e;font-weight:700;">*</span> are required.</p>
 
@@ -748,8 +747,6 @@ function resetSurvey() {
     document.getElementById('respondent-name').value = '';
     document.getElementById('submit-datetime').value = 'Will be recorded on submit';
     document.getElementById('submit-btn').disabled = false;
-    document.getElementById('survey-status-badge').textContent = 'Draft';
-    document.getElementById('survey-status-badge').className = 'badge badge-pending';
     document.getElementById('survey-header-card').classList.remove('hidden');
     document.getElementById('survey-departments').classList.remove('hidden');
     document.getElementById('survey-add-btn').classList.remove('hidden');
