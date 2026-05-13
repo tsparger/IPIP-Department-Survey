@@ -479,10 +479,8 @@ function renderDeptForm(d, i) {
             <div class="form-row">
                 <div class="form-group">
                     <label class="required">Main Supplying Pharmacy</label>
-                    <select data-req="dept-${i}" onchange="handleMainPharmacyChange(${i}, this.value)">
-                        <option value="">-- Select Pharmacy --</option>
-                        ${getMainPharmacies().map(p => `<option value="${esc(p)}" ${d.mainSupplyingPharmacy===p?'selected':''}>${esc(p)}</option>`).join('')}
-                    </select>
+                    <input type="text" data-req="dept-${i}" list="pharm-list-${i}" value="${esc(d.mainSupplyingPharmacy)}" placeholder="Type to search or click the arrow" onchange="handleMainPharmacyChange(${i}, this.value)" />
+                    <datalist id="pharm-list-${i}">${getMainPharmacies().map(p => `<option value="${esc(p)}"></option>`).join('')}</datalist>
                 </div>
                 <div class="form-group">
                     <label class="required">Supplying RX Location Code</label>
