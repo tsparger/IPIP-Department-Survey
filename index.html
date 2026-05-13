@@ -202,7 +202,7 @@ const SURVEY_DATA = {"regions":["NCAL","SCAL"],"locations":{"NCAL":["Alameda Med
     <!-- Success screen (hidden until submit) -->
     <div class="card hidden" id="success-screen">
         <div class="success-screen">
-            <div class="checkmark">&#10003;</div>
+            <div class="checkmark">✅</div>
             <h2>Survey Submitted Successfully!</h2>
             <p class="text-muted" style="font-size:15px;" id="success-details"></p>
             <button class="btn btn-primary mt-4" onclick="resetSurvey()" style="margin-top:24px;">Submit Another Response</button>
@@ -401,12 +401,12 @@ function locationStatus(region, location) {
     if (!all.length) return '';
     const done = all.filter(dep => isDeptCompleted(region, location, dep)).length;
     if (done === 0) return '<div class="completion-hint">No departments submitted yet at this location.</div>';
-    if (done === all.length) return `<div class="completion-hint completion-done">&#10003; All ${all.length} departments completed at this location.</div>`;
+    if (done === all.length) return `<div class="completion-hint completion-done">✅ All ${all.length} departments completed at this location.</div>`;
     return `<div class="completion-hint completion-partial">${done} of ${all.length} departments submitted at this location.</div>`;
 }
 function departmentStatus(region, location, dept) {
     if (!region || !location || !dept) return '';
-    if (isDeptCompleted(region, location, dept)) return '<div class="completion-hint completion-done">&#10003; This department has already been submitted.</div>';
+    if (isDeptCompleted(region, location, dept)) return '<div class="completion-hint completion-done">✅ This department has already been submitted.</div>';
     return '';
 }
 
@@ -427,7 +427,7 @@ function handleRegionChange(i, value) {
     renderSurvey();
 }
 function handleLocationChange(i, value) {
-    value = value.replace(/^✓\s*/, '');
+    value = value.replace(/^[✓✅]\s*/, '');
     const d = surveyDepts[i];
     d.location = value;
     d.department = '';
@@ -435,7 +435,7 @@ function handleLocationChange(i, value) {
     renderSurvey();
 }
 function handleDepartmentChange(i, value) {
-    value = value.replace(/^✓\s*/, '');
+    value = value.replace(/^[✓✅]\s*/, '');
     const d = surveyDepts[i];
     d.department = value;
     const row = getDeptRow(d.region, d.location, value);
@@ -503,7 +503,7 @@ function renderDeptForm(d, i) {
                     <label class="required">Location</label>
                     <input type="text" data-req="dept-${i}" list="loc-list-${i}" value="${esc(d.location)}" ${!d.region?'disabled':''} placeholder="${d.region?'Type to search or click the arrow':'Select Region first'}" onchange="handleLocationChange(${i}, this.value)" />
                     ${d.region ? `<datalist id="loc-list-${i}">${getLocationsForRegion(d.region).map(loc => {
-                        const prefix = isLocationCompleted(d.region, loc) ? '✓ ' : '';
+                        const prefix = isLocationCompleted(d.region, loc) ? '✅ ' : '';
                         return `<option value="${esc(prefix + loc)}"></option>`;
                     }).join('')}</datalist>` : ''}
                     ${locationStatus(d.region, d.location)}
@@ -512,7 +512,7 @@ function renderDeptForm(d, i) {
                     <label class="required">Department</label>
                     <input type="text" data-req="dept-${i}" list="dept-list-${i}" value="${esc(d.department)}" ${(!d.region || !d.location)?'disabled':''} placeholder="${(d.region && d.location)?'Type to search or click the arrow':'Select Location first'}" onchange="handleDepartmentChange(${i}, this.value)" />
                     ${(d.region && d.location) ? `<datalist id="dept-list-${i}">${getDepartmentsForLocation(d.region, d.location).map(dep => {
-                        const prefix = isDeptCompleted(d.region, d.location, dep) ? '✓ ' : '';
+                        const prefix = isDeptCompleted(d.region, d.location, dep) ? '✅ ' : '';
                         return `<option value="${esc(prefix + dep)}"></option>`;
                     }).join('')}</datalist>` : ''}
                     ${departmentStatus(d.region, d.location, d.department)}
