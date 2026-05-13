@@ -215,8 +215,11 @@ const SURVEY_DATA = {"regions":["NCAL","SCAL"],"locations":{"NCAL":["Alameda Med
 <script>
 // ============ CONFIG ============
 const EMBEDDED_FLOW_URL = 'https://997e87e2062feb52af5c332a27e4b4.0d.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/ff587e61873d410a9b6af00baf0a2312/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=6nBKlVvqUmMixeFvw0HQHb01V_DNrgIpSS-37oZFE14';
+const EMBEDDED_GET_RESPONSES_URL = ''; // Paste Flow 2 URL here after building it
 let URLS = JSON.parse(localStorage.getItem('ipip-flow-urls') || '{}');
 if (EMBEDDED_FLOW_URL) URLS.submit = EMBEDDED_FLOW_URL;
+if (EMBEDDED_GET_RESPONSES_URL) URLS.responses = EMBEDDED_GET_RESPONSES_URL;
+let remoteCompleted = {};
 let surveyDepts = [];
 
 function isConnected() { return !!URLS.submit; }
@@ -383,7 +386,9 @@ function markCompleted(depts) {
 function isDeptCompleted(region, location, department) {
     const map = getCompleted();
     const key = `${region}||${location}`;
-    return map[key] && map[key].includes(department);
+    if (map[key] && map[key].includes(department)) return true;
+    if (remoteCompleted[key] && remoteCompleted[key].includes(department)) return true;
+    return false;
 }
 function isLocationCompleted(region, location) {
     const all = getDepartmentsForLocation(region, location);
@@ -392,14 +397,12 @@ function isLocationCompleted(region, location) {
 }
 function locationStatus(region, location) {
     if (!region || !location) return '';
-    const total = getDepartmentsForLocation(region, location).length;
-    if (!total) return '';
-    const map = getCompleted();
-    const key = `${region}||${location}`;
-    const done = (map[key] || []).length;
+    const all = getDepartmentsForLocation(region, location);
+    if (!all.length) return '';
+    const done = all.filter(dep => isDeptCompleted(region, location, dep)).length;
     if (done === 0) return '<div class="completion-hint">No departments submitted yet at this location.</div>';
-    if (done === total) return `<div class="completion-hint completion-done">&#10003; All ${total} departments completed at this location.</div>`;
-    return `<div class="completion-hint completion-partial">${done} of ${total} departments submitted at this location.</div>`;
+    if (done === all.length) return `<div class="completion-hint completion-done">&#10003; All ${all.length} departments completed at this location.</div>`;
+    return `<div class="completion-hint completion-partial">${done} of ${all.length} departments submitted at this location.</div>`;
 }
 function departmentStatus(region, location, dept) {
     if (!region || !location || !dept) return '';
@@ -424,6 +427,7 @@ function handleRegionChange(i, value) {
     renderSurvey();
 }
 function handleLocationChange(i, value) {
+    value = value.replace(/^✓\s*/, '');
     const d = surveyDepts[i];
     d.location = value;
     d.department = '';
@@ -431,6 +435,7 @@ function handleLocationChange(i, value) {
     renderSurvey();
 }
 function handleDepartmentChange(i, value) {
+    value = value.replace(/^✓\s*/, '');
     const d = surveyDepts[i];
     d.department = value;
     const row = getDeptRow(d.region, d.location, value);
@@ -497,13 +502,19 @@ function renderDeptForm(d, i) {
                 <div class="form-group">
                     <label class="required">Location</label>
                     <input type="text" data-req="dept-${i}" list="loc-list-${i}" value="${esc(d.location)}" ${!d.region?'disabled':''} placeholder="${d.region?'Type to search or click the arrow':'Select Region first'}" onchange="handleLocationChange(${i}, this.value)" />
-                    ${d.region ? `<datalist id="loc-list-${i}">${getLocationsForRegion(d.region).map(loc => `<option value="${esc(loc)}"></option>`).join('')}</datalist>` : ''}
+                    ${d.region ? `<datalist id="loc-list-${i}">${getLocationsForRegion(d.region).map(loc => {
+                        const prefix = isLocationCompleted(d.region, loc) ? '✓ ' : '';
+                        return `<option value="${esc(prefix + loc)}"></option>`;
+                    }).join('')}</datalist>` : ''}
                     ${locationStatus(d.region, d.location)}
                 </div>
                 <div class="form-group">
                     <label class="required">Department</label>
                     <input type="text" data-req="dept-${i}" list="dept-list-${i}" value="${esc(d.department)}" ${(!d.region || !d.location)?'disabled':''} placeholder="${(d.region && d.location)?'Type to search or click the arrow':'Select Location first'}" onchange="handleDepartmentChange(${i}, this.value)" />
-                    ${(d.region && d.location) ? `<datalist id="dept-list-${i}">${getDepartmentsForLocation(d.region, d.location).map(dep => `<option value="${esc(dep)}"></option>`).join('')}</datalist>` : ''}
+                    ${(d.region && d.location) ? `<datalist id="dept-list-${i}">${getDepartmentsForLocation(d.region, d.location).map(dep => {
+                        const prefix = isDeptCompleted(d.region, d.location, dep) ? '✓ ' : '';
+                        return `<option value="${esc(prefix + dep)}"></option>`;
+                    }).join('')}</datalist>` : ''}
                     ${departmentStatus(d.region, d.location, d.department)}
                 </div>
             </div>
@@ -790,11 +801,29 @@ function checkAdmin() {
 }
 
 // ============ INIT ============
+async function loadRemoteCompletions() {
+    if (!URLS.responses) return;
+    try {
+        const result = await flowGet(URLS.responses, 10000);
+        const rows = (result && result.responses) || [];
+        const map = {};
+        rows.forEach(r => {
+            if (!r.Region || !r.Location || !r.Department) return;
+            const key = `${r.Region}||${r.Location}`;
+            if (!map[key]) map[key] = [];
+            if (!map[key].includes(r.Department)) map[key].push(r.Department);
+        });
+        remoteCompleted = map;
+        renderSurvey();
+    } catch (e) { /* silent — page still works without it */ }
+}
+
 function init() {
     checkAdmin();
     if (URLS.submit) document.getElementById('api-url-submit').value = URLS.submit;
     document.getElementById('public-survey-link').textContent = location.origin + location.pathname;
     renderSurvey();
+    loadRemoteCompletions();
 
     if (isConnected()) {
         document.getElementById('api-status').innerHTML = '<span style="color:#38a169;font-weight:600;">Connected</span>';
