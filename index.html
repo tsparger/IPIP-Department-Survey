@@ -299,7 +299,7 @@ function makeDept() {
         onelinkLocDesc:'', onelinkLocCode:'', onelinkCostCenter:'', glString:'', dea:'', stateLicense:'', onelinkRequesterId:'',
         mainSupplyingPharmacy:'', supplyingRxLocCode:'', currentDispenseLogic:'', dispenseLogicCorrect:'', correctDispenseLogic:'',
         numPyxis:'', numNonPyxis:'', numDispensingPharmacies:'', fillingPharmacies:'',
-        otherPyxis:'', otherRefrigerators:'', otherFloorStocks:'', roomsBeds:'', missingSupplyPharmacies:'',
+        otherPyxis:'', otherRefrigerators:'', otherFloorStocks:'', crashCarts:'', roomsBeds:'', missingSupplyPharmacies:'',
         onelinkNotInScope: false,
         performsRecharges:'', requestorId:'', sharedInventory:'', sharedDepts:[], sharedDeptsOther:'', currentLocations:'',
         orderDays:'', orderFrequency:'', orderTime:'', futureAdditions:'', comments:'',
@@ -318,6 +318,12 @@ function renderSurvey() {
 function sd(i, field) { return `surveyDepts[${i}]['${field}']`; }
 function onch(i, field) { return `onchange="${sd(i,field)}=this.value"`; }
 function onchk(i, field) { return `onchange="${sd(i,field)}=this.checked"`; }
+
+// Trim, drop empty lines, and prefix each remaining line with "1. ", "2. ", ...
+function numberLines(text) {
+    if (!text) return '';
+    return text.split('\n').filter(l => l.trim()).map((line, i) => `${i+1}. ${line.trim()}`).join('\n');
+}
 
 function handleDispLogicChange(i, value) {
     surveyDepts[i].dispenseLogicCorrect = value;
@@ -548,7 +554,7 @@ function handleDepartmentChange(i, value) {
         d.city = row.city || '';
         d.state = row.state || '';
         d.zip = row.zip || '';
-        d.currentDispenseLogic = row.dispenseLogic || '';
+        d.currentDispenseLogic = numberLines(row.dispenseLogic || '');
     } else {
         clearDeptAutoFields(d);
     }
@@ -665,18 +671,19 @@ function renderDeptForm(d, i) {
                 </div>
             </div>
             <div class="form-group"><label class="required">Current Dispense Logic Hierarchy</label>
-                <textarea class="autofill-field" data-req="dept-${i}" ${onch(i,'currentDispenseLogic')} placeholder="Auto-filled from selected Department">${esc(d.currentDispenseLogic)}</textarea>
+                <textarea class="autofill-field" data-req="dept-${i}" readonly rows="${Math.max((d.currentDispenseLogic||'').split('\n').length, 4)}" style="overflow-y:hidden;" placeholder="Auto-filled from selected Department">${esc(d.currentDispenseLogic)}</textarea>
+                <div class="lock-callout" style="background:#ebf8ff;border-color:#90cdf4;color:#2c5282;">Some locations may be listed more than once due to special considerations not described here (ex: narcotics only, breast milk, home infusion).</div>
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label class="required">Current Dispense Logic correct?</label>
+                    <label class="required">Are all dispensing locations for this department listed?</label>
                     <div class="radio-group" data-req-radio="dept-${i}" data-field="dispLogic-${i}">
                         <label><input type="radio" name="dispLogic-${i}" value="Yes" ${d.dispenseLogicCorrect==='Yes'?'checked':''} onchange="handleDispLogicChange(${i},'Yes')" /> Yes</label>
                         <label><input type="radio" name="dispLogic-${i}" value="No" ${d.dispenseLogicCorrect==='No'?'checked':''} onchange="handleDispLogicChange(${i},'No')" /> No</label>
                     </div>
                 </div>
-                <div class="form-group"><label>Enter correct Dispense Logic (if No)</label>
-                    <textarea ${d.dispenseLogicCorrect==='No'?onch(i,'correctDispenseLogic'):''} class="${d.dispenseLogicCorrect==='No'?'':'disabled-field'}" ${d.dispenseLogicCorrect==='No'?'':'readonly'} placeholder="${d.dispenseLogicCorrect==='No'?'Enter the correct dispense logic...':'Select No above to enable this field'}">${esc(d.correctDispenseLogic)}</textarea>
+                <div class="form-group"><label>List missing/additional dispensing locations to be added to dispense logic, describe any considerations to this location</label>
+                    <textarea ${d.dispenseLogicCorrect==='No'?onch(i,'correctDispenseLogic'):''} class="${d.dispenseLogicCorrect==='No'?'':'disabled-field'}" ${d.dispenseLogicCorrect==='No'?'':'readonly'} placeholder="${d.dispenseLogicCorrect==='No'?'e.g., PACU 2 Pyxis — only narcotics are dispensed here, ...':'Select No above to enable this field'}">${esc(d.correctDispenseLogic)}</textarea>
                 </div>
             </div>
         </div>
@@ -712,18 +719,21 @@ function renderDeptForm(d, i) {
 
         <div class="section-header">Inventory Details</div>
         <div class="section-body">
-            <div class="form-group"><label>List other Pyxis Machines</label>
-                <textarea ${onch(i,'otherPyxis')} placeholder="List additional Pyxis machines...">${esc(d.otherPyxis)}</textarea>
+            <div class="form-group"><label>List Pyxis Machines dispensing to this department</label>
+                <textarea ${onch(i,'otherPyxis')} placeholder="e.g., ICU1 IP RX PYXIS, ICU2 IP RX PYXIS, MEDSUG1 IP RX PYXIS, MEDSURG2 IP RX PYXIS, ...">${esc(d.otherPyxis)}</textarea>
             </div>
             <div class="form-group">
-                <label>List other Refrigerators</label>
+                <label>List Refrigerators dispensing to this department</label>
                 <div class="lock-callout">IMPORTANT: Please indicate whether each refrigerator is <strong>LOCKED</strong> or <strong>UNLOCKED</strong></div>
-                <textarea ${onch(i,'otherRefrigerators')} placeholder="e.g., Unit A Fridge - LOCKED, Unit B Fridge - UNLOCKED...">${esc(d.otherRefrigerators)}</textarea>
+                <textarea ${onch(i,'otherRefrigerators')} placeholder="e.g., Unit A Fridge - LOCKED, Unit B Fridge - UNLOCKED, ...">${esc(d.otherRefrigerators)}</textarea>
             </div>
             <div class="form-group">
-                <label>List other Floor Stocks</label>
-                <div class="lock-callout">IMPORTANT: Please indicate whether each floor stock is <strong>LOCKED</strong> or <strong>UNLOCKED</strong></div>
-                <textarea ${onch(i,'otherFloorStocks')} placeholder="e.g., Materials Mgmt FS - LOCKED, Pharmacy FS - UNLOCKED...">${esc(d.otherFloorStocks)}</textarea>
+                <label>List Floor Stocks dispensing to this department</label>
+                <textarea ${onch(i,'otherFloorStocks')} placeholder="e.g., Pharmacy floor stock - locked, Materials Management floor stock - unlocked, ...">${esc(d.otherFloorStocks)}</textarea>
+            </div>
+            <div class="form-group">
+                <label>List Crash Carts in this department</label>
+                <textarea ${onch(i,'crashCarts')} placeholder="e.g., ED BAY 1 Crash Cart, L&amp;D Room 1 Crash Cart, ...">${esc(d.crashCarts)}</textarea>
             </div>
             <div class="form-row">
                 <div class="form-group"><label class="required">Which rooms, beds, Care Areas/Hallways do the floor stock service?</label>
