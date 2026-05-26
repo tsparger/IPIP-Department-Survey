@@ -729,6 +729,7 @@ function renderDeptForm(d, i) {
             </div>
             <div class="form-group">
                 <label>List Floor Stocks dispensing to this department</label>
+                <div class="lock-callout">IMPORTANT: Please indicate whether each floor stock is <strong>LOCKED</strong> or <strong>UNLOCKED</strong></div>
                 <textarea ${onch(i,'otherFloorStocks')} placeholder="e.g., Pharmacy floor stock - locked, Materials Management floor stock - unlocked, ...">${esc(d.otherFloorStocks)}</textarea>
             </div>
             <div class="form-group">
