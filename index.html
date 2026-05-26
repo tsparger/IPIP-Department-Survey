@@ -614,8 +614,7 @@ function renderDeptForm(d, i) {
                     <label class="required">Region</label>
                     <select data-req="dept-${i}" onchange="handleRegionChange(${i}, this.value)">
                         <option value="">-- Select Region --</option>
-                        <option value="NCAL" ${d.region==='NCAL'?'selected':''}>NCAL</option>
-                        <option value="SCAL" ${d.region==='SCAL'?'selected':''}>SCAL</option>
+                        ${((_data() && _data().regions) || ['NCAL','SCAL']).map(r => `<option value="${esc(r)}" ${d.region===r?'selected':''}>${esc(r)}</option>`).join('')}
                     </select>
                 </div>
                 <div class="form-group">
