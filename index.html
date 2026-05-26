@@ -312,6 +312,7 @@ function addDepartment() { surveyDepts.push(makeDept()); renderSurvey(); }
 function renderSurvey() {
     if (!surveyDepts.length) surveyDepts = [makeDept()];
     document.getElementById('survey-departments').innerHTML = surveyDepts.map((d, i) => renderDeptForm(d, i)).join('');
+    persistActiveDraft();
 }
 
 function sd(i, field) { return `surveyDepts[${i}]['${field}']`; }
@@ -411,6 +412,48 @@ function savePendingDrafts(depts) {
 function getPendingDraft(region, location, department) {
     if (!region || !location || !department) return null;
     return getPendingDrafts()[`${region}||${location}||${department}`] || null;
+}
+
+// ============ ACTIVE-DRAFT AUTOSAVE ============
+// Persist the in-progress surveyDepts array and respondent name on every change
+// so that an unexpected refresh, browser sleep, or page reload restores the
+// user's work instead of clearing it.
+const ACTIVE_DRAFT_KEY = 'ipip-active-draft';
+function persistActiveDraft() {
+    try {
+        const nameEl = document.getElementById('respondent-name');
+        localStorage.setItem(ACTIVE_DRAFT_KEY, JSON.stringify({
+            surveyDepts: surveyDepts,
+            respondentName: nameEl ? nameEl.value : '',
+            savedAt: Date.now()
+        }));
+    } catch {}
+}
+let _persistTimer;
+function persistActiveDraftDebounced() {
+    clearTimeout(_persistTimer);
+    _persistTimer = setTimeout(persistActiveDraft, 400);
+}
+function restoreActiveDraft() {
+    try {
+        const raw = localStorage.getItem(ACTIVE_DRAFT_KEY);
+        if (!raw) return;
+        const draft = JSON.parse(raw);
+        if (Array.isArray(draft.surveyDepts) && draft.surveyDepts.length) {
+            surveyDepts = draft.surveyDepts;
+        }
+        // Respondent name is restored after init() finishes the first render.
+        if (draft.respondentName) {
+            const apply = () => {
+                const el = document.getElementById('respondent-name');
+                if (el) el.value = draft.respondentName;
+            };
+            apply();
+        }
+    } catch {}
+}
+function clearActiveDraft() {
+    try { localStorage.removeItem(ACTIVE_DRAFT_KEY); } catch {}
 }
 function isDeptCompleted(region, location, department) {
     const map = getCompleted();
@@ -845,6 +888,7 @@ async function submitSurvey() {
             if (result.success) {
                 markCompleted(surveyDepts);
                 savePendingDrafts(surveyDepts);
+                clearActiveDraft();
                 showSuccessScreen(nameVal, now, surveyDepts.length);
             } else {
                 toast('Submission failed: ' + (result.error || 'Unknown error'), true);
@@ -873,6 +917,7 @@ function showSuccessScreen(name, date, deptCount) {
 }
 
 function resetSurvey() {
+    clearActiveDraft();
     surveyDepts = [makeDept()];
     document.getElementById('respondent-name').value = '';
     document.getElementById('submit-datetime').value = 'Will be recorded on submit';
@@ -907,12 +952,19 @@ async function loadRemoteCompletions() {
         const map = {};
         rows.forEach(r => {
             if (!r.Region || !r.Location || !r.Department) return;
+            // Only count a remote submission as a checkmark if the user
+            // confirmed the info (matches the local rule).
+            const confirmed = r.InfoCorrect === 'Yes' || r.InfoModified === 'Yes';
+            const hasNewFields = ('InfoCorrect' in r) || ('InfoModified' in r);
+            if (hasNewFields && !confirmed) return;
             const key = `${r.Region}||${r.Location}`;
             if (!map[key]) map[key] = [];
             if (!map[key].includes(r.Department)) map[key].push(r.Department);
         });
         remoteCompleted = map;
-        renderSurvey();
+        // Do NOT call renderSurvey() here — the user may be mid-edit, and a full
+        // DOM rebuild would lose focus/cursor and feel like a random refresh.
+        // The next user-driven render will pick up the new remoteCompleted map.
     } catch (e) { /* silent — page still works without it */ }
 }
 
@@ -920,7 +972,26 @@ function init() {
     checkAdmin();
     if (URLS.submit) document.getElementById('api-url-submit').value = URLS.submit;
     document.getElementById('public-survey-link').textContent = location.origin + location.pathname;
+    restoreActiveDraft();
     renderSurvey();
+    // Restore the respondent name AFTER the initial render so the DOM exists.
+    try {
+        const raw = localStorage.getItem(ACTIVE_DRAFT_KEY);
+        if (raw) {
+            const draft = JSON.parse(raw);
+            if (draft.respondentName) {
+                const el = document.getElementById('respondent-name');
+                if (el) el.value = draft.respondentName;
+            }
+        }
+    } catch {}
+    // Catch raw typing on any input/select/textarea inside the survey so
+    // direct onchange="surveyDepts[i].field=this.value" mutations also persist.
+    const surveyView = document.getElementById('view-survey');
+    if (surveyView) {
+        surveyView.addEventListener('input', persistActiveDraftDebounced);
+        surveyView.addEventListener('change', persistActiveDraftDebounced);
+    }
     loadRemoteCompletions();
 
     if (isConnected()) {
