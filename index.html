@@ -81,7 +81,7 @@
         .text-muted { color: #718096; font-size: 13px; }
         .hidden { display: none !important; }
 
-        .multi-select { border: 1px solid #cbd5e0; border-radius: 6px; max-height: 150px; overflow-y: auto; padding: 4px; margin-bottom: 10px; }
+        .multi-select { border: 1px solid #cbd5e0; border-radius: 6px; max-height: 150px; overflow-y: auto; padding: 4px; margin-bottom: 10px; background: white; }
         .multi-select label { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-weight: normal; cursor: pointer; font-size: 13px; }
         .multi-select label:hover { background: #f7fafc; }
         .multi-select input { width: auto; margin: 0; }
@@ -302,7 +302,7 @@ function makeDept() {
         numPyxis:'', numNonPyxis:'', numDispensingPharmacies:'', fillingPharmacies:'',
         otherPyxis:'', otherRefrigerators:'', otherFloorStocks:'', crashCarts:'', roomsBeds:'', missingSupplyPharmacies:'',
         onelinkNotInScope: false,
-        performsRecharges:'', requestorId:'', sharedInventory:'', sharedDepts:[], sharedDeptsOther:'', currentLocations:'',
+        performsRecharges:'', requestorId:'', onelinkRechargesComments:'', sharedInventory:'', sharedDepts:[], sharedDeptsOther:'', currentLocations:'',
         orderDays:'', orderFrequency:'', orderTime:'', futureAdditions:'', comments:'',
         infoCorrect:'', infoModified:''
     };
@@ -751,14 +751,14 @@ function renderDeptForm(d, i) {
         <div class="section-body">
             <div class="form-row-3">
                 <div class="form-group">
-                    <label class="required">Do you perform recharges in OneLink when medications are sent to/from associated Departments?</label>
+                    <label class="required">Do you perform recharges in OneLink when medications are sent to/from Shared/Associated NON-inpatient Departments/Clinics?</label>
                     <div class="radio-group" data-req-radio="dept-${i}" data-field="recharges-${i}">
                         <label><input type="radio" name="recharges-${i}" value="Yes" ${d.performsRecharges==='Yes'?'checked':''} onchange="handleRechargeChange(${i},'Yes')" /> Yes</label>
                         <label><input type="radio" name="recharges-${i}" value="No" ${d.performsRecharges==='No'?'checked':''} onchange="handleRechargeChange(${i},'No')" /> No</label>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label class="${d.performsRecharges==='Yes'?'required':''}">Requestor ID (Item Master Inventory Location ID)</label>
+                    <label class="${d.performsRecharges==='Yes'?'required':''}">Requestor ID of Shared/Associated NON-inpatient Departments/Clinics (Item Master Inventory Location ID)</label>
                     <input type="text" value="${esc(d.requestorId)}" ${d.performsRecharges==='Yes'?`data-req="dept-${i}"`:''} class="${reqClass}" ${reqReadonly} ${reqDisabled?'':`onchange="${sd(i,'requestorId')}=this.value"`} placeholder="${reqDisabled?'Select Yes for recharges to enable this field':'Enter Requestor ID...'}" />
                 </div>
                 <div class="form-group">
@@ -769,19 +769,24 @@ function renderDeptForm(d, i) {
                     </div>
                 </div>
             </div>
+            <div class="form-group">
+                <label>Comments for OneLink Recharges of Shared/Associated NON-inpatient Departments and Clinics serviced by the inpatient pharmacy (e.g. IP pharmacy compounding for and dispensing to infusion clinics, ONC pharmacy compounding for and dispensing to admitted IP patients)</label>
+                <textarea ${onch(i,'onelinkRechargesComments')} placeholder="Optional — add any context about OneLink recharges for non-inpatient departments/clinics...">${esc(d.onelinkRechargesComments)}</textarea>
+            </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label class="${d.sharedInventory==='Yes'?'required':''}">Shared/Associated Departments and Clinics</label>
-                    ${(d.region && d.location) ? `
-                        <div class="multi-select">
-                            ${getDepartmentsForLocation(d.region, d.location).filter(dep => dep !== d.department).map(opt => `
-                                <label><input type="checkbox" ${(d.sharedDepts||[]).includes(opt)?'checked':''} onchange="toggleMulti(${i},'sharedDepts','${esc(opt)}',this.checked)" /> ${esc(opt)}</label>
-                            `).join('')}
-                        </div>
-                        <input type="text" placeholder="Other (free text) - type additional departments..." ${onch(i,'sharedDeptsOther')} value="${esc(d.sharedDeptsOther||'')}" />
-                    ` : `
-                        <div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">Select a Region and Location above first to see available departments.</div>
-                    `}
+                    <label class="${d.sharedInventory==='Yes'?'required':''}">Shared/Associated Non-Inpatient Departments and Clinics serviced by the inpatient pharmacy</label>
+                    ${(() => {
+                        if (!(d.region && d.location)) {
+                            return `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">Select a Region and Location above first to see available departments.</div>`;
+                        }
+                        const otherDepts = getDepartmentsForLocation(d.region, d.location).filter(dep => dep !== d.department);
+                        const otherInput = `<input type="text" placeholder="Other (free text) - type additional departments..." ${onch(i,'sharedDeptsOther')} value="${esc(d.sharedDeptsOther||'')}" />`;
+                        if (otherDepts.length === 0) {
+                            return `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">No other departments listed at this location. Use the "Other" box below to add any shared/associated departments or clinics.</div>${otherInput}`;
+                        }
+                        return `<div class="multi-select">${otherDepts.map(opt => `<label><input type="checkbox" ${(d.sharedDepts||[]).includes(opt)?'checked':''} onchange="toggleMulti(${i},'sharedDepts','${esc(opt)}',this.checked)" /> ${esc(opt)}</label>`).join('')}</div>${otherInput}`;
+                    })()}
                 </div>
                 <div class="form-group"><label class="${d.sharedInventory==='Yes'?'required':''}">Current Location(s) that store products</label>
                     <textarea ${d.sharedInventory==='Yes'?`data-req="dept-${i}"`:''} class="${d.sharedInventory==='Yes'?'':'disabled-field'}" ${d.sharedInventory==='Yes'?'':'readonly'} ${d.sharedInventory==='Yes'?onch(i,'currentLocations'):''} placeholder="${d.sharedInventory==='Yes'?'List current locations...':'Select Yes for shared inventory above to enable this field'}">${esc(d.currentLocations)}</textarea>
