@@ -524,7 +524,11 @@ function handleOnelinkScopeChange(i, checked) {
     const d = surveyDepts[i];
     d.onelinkNotInScope = checked;
     if (checked) {
-        clearOneLinkFields(d);
+        // Clear only the fields in the OneLink Information section.
+        // Supplying RX Location Code and OneLink Requestor ID live in the
+        // Dispensing Information section and stay populated regardless of scope.
+        d.onelinkLocDesc = ''; d.onelinkLocCode = '';
+        d.onelinkCostCenter = ''; d.glString = ''; d.dea = ''; d.stateLicense = '';
     } else if (d.mainSupplyingPharmacy) {
         // Refill OneLink fields from the previously-selected Main Supplying Pharmacy
         // so unchecking the box (e.g., after a misclick) restores the autofill.
