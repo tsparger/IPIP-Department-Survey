@@ -192,7 +192,8 @@
     </div>
 
     <div class="card" id="survey-submit-card">
-        <div style="text-align:right;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <button class="btn btn-secondary" onclick="clearAllFields()" type="button">Clear All Fields</button>
             <button class="btn btn-success" onclick="submitSurvey()" id="submit-btn" style="padding:14px 40px; font-size:16px;">Submit Survey</button>
         </div>
     </div>
@@ -925,6 +926,12 @@ function showSuccessScreen(name, date, deptCount) {
     document.getElementById('success-details').innerHTML =
         `Submitted by <strong>${esc(name)}</strong> on <strong>${date.toLocaleString()}</strong><br/>${deptCount} department(s) recorded.`;
     window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function clearAllFields() {
+    if (!confirm('Clear all fields and start over?\n\nYour current in-progress responses will be erased. Previously submitted departments stay marked with their green checkmark and will still pre-fill if you re-select them.')) return;
+    resetSurvey();
+    toast('All fields cleared.');
 }
 
 function resetSurvey() {
