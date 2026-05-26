@@ -168,7 +168,8 @@
         <div class="flex-between mb-2">
             <h2 style="border:none;padding:0;">KP NPI IPIP - Validate KPHC Departments</h2>
         </div>
-        <p style="margin-bottom:16px;">Please complete the following for each department in scope. Fields marked with <span style="color:#e53e3e;font-weight:700;">*</span> are required.</p>
+        <p style="margin-bottom:12px;">Please complete the following for each department in scope. Fields marked with <span style="color:#e53e3e;font-weight:700;">*</span> are required.</p>
+        <div class="lock-callout" style="background:#ebf8ff;border-color:#90cdf4;color:#2c5282;margin-bottom:16px;">When you're finished, click <strong>Submit Survey</strong> at the bottom of the page to save your entry. Your in-progress responses are autosaved in this browser, so you can safely close the tab and finish later — but nothing is sent to the team until you click Submit.</div>
 
         <div class="section-header">Respondent Information</div>
         <div class="section-body">
@@ -303,7 +304,7 @@ function makeDept() {
         otherPyxis:'', otherRefrigerators:'', otherFloorStocks:'', crashCarts:'', roomsBeds:'', missingSupplyPharmacies:'',
         onelinkNotInScope: false,
         performsRecharges:'', requestorId:'', onelinkRechargesComments:'', sharedInventory:'', sharedDepts:[], sharedDeptsOther:'', currentLocations:'',
-        orderDays:'', orderFrequency:'', orderTime:'', futureAdditions:'', comments:'',
+        orderDays:'', orderFrequency:'', orderTime:[], futureAdditions:'', comments:'',
         infoCorrect:'', infoModified:''
     };
 }
@@ -596,6 +597,8 @@ function renderDeptForm(d, i) {
     const reqClass = reqDisabled ? 'disabled-field' : '';
     const reqReadonly = reqDisabled ? 'readonly' : '';
     const noPharmMapping = !!(d.region && d.location && !getPharmacyForLocation(d.region, d.location));
+    // Migrate legacy single-select orderTime ('AM/Early Morning' string) to array form.
+    if (typeof d.orderTime === 'string') d.orderTime = d.orderTime ? [d.orderTime] : [];
 
     return `
     <div class="dept-entry">
@@ -801,12 +804,12 @@ function renderDeptForm(d, i) {
         <div class="section-body">
             <div class="form-row-3">
                 <div class="form-group"><label class="required">What days does this Department place orders?</label><input type="text" data-req="dept-${i}" value="${esc(d.orderDays)}" ${onch(i,'orderDays')} placeholder="e.g., Mon-Fri, Daily, etc." /></div>
-                <div class="form-group"><label class="required">Order Frequency</label><input type="text" data-req="dept-${i}" value="${esc(d.orderFrequency)}" ${onch(i,'orderFrequency')} placeholder="e.g., Daily, Twice Daily, Weekly" /></div>
+                <div class="form-group"><label class="required">Order Frequency</label><input type="text" data-req="dept-${i}" value="${esc(d.orderFrequency)}" ${onch(i,'orderFrequency')} placeholder="e.g., Daily, Twice Daily, Weekly, Weekdays only, ..." /></div>
                 <div class="form-group">
-                    <label class="required">Time of Day of Ordering</label>
-                    <div class="radio-group" data-req-radio="dept-${i}" data-field="orderTime-${i}">
-                        <label><input type="radio" name="orderTime-${i}" value="AM/Early Morning" ${d.orderTime==='AM/Early Morning'?'checked':''} onchange="${sd(i,'orderTime')}=this.value" /> AM/Early Morning</label>
-                        <label><input type="radio" name="orderTime-${i}" value="PM/Mid Afternoon" ${d.orderTime==='PM/Mid Afternoon'?'checked':''} onchange="${sd(i,'orderTime')}=this.value" /> PM/Mid Afternoon</label>
+                    <label class="required">Time of Day of Ordering (select all that apply)</label>
+                    <div class="radio-group" data-orderTime="dept-${i}">
+                        <label><input type="checkbox" ${(d.orderTime||[]).includes('AM/Early Morning')?'checked':''} onchange="toggleMulti(${i},'orderTime','AM/Early Morning',this.checked)" /> AM/Early Morning</label>
+                        <label><input type="checkbox" ${(d.orderTime||[]).includes('PM/Mid Afternoon')?'checked':''} onchange="toggleMulti(${i},'orderTime','PM/Mid Afternoon',this.checked)" /> PM/Mid Afternoon</label>
                     </div>
                 </div>
             </div>
@@ -876,6 +879,14 @@ function validateSurvey() {
         });
         if (d.sharedInventory === 'Yes' && !(d.sharedDepts && d.sharedDepts.length) && !(d.sharedDeptsOther && d.sharedDeptsOther.trim())) {
             errors.push(`Department ${i+1}: Shared/Associated Departments is required when inventory is shared.`);
+        }
+        if (!Array.isArray(d.orderTime) || d.orderTime.length === 0) {
+            const otGroup = document.querySelector(`[data-orderTime="dept-${i}"]`);
+            if (otGroup) { otGroup.style.border = '2px solid #e53e3e'; otGroup.style.borderRadius = '6px'; otGroup.style.padding = '4px 8px'; }
+            errors.push(`Department ${i+1}: Select at least one Time of Day of Ordering.`);
+        } else {
+            const otGroup = document.querySelector(`[data-orderTime="dept-${i}"]`);
+            if (otGroup) { otGroup.style.border = ''; otGroup.style.borderRadius = ''; otGroup.style.padding = '4px 0'; }
         }
     });
     return [...new Set(errors)];
