@@ -294,6 +294,7 @@ function copySurveyLink() {
 function makeDept() {
     return {
         region:'', location:'', department:'', specialty:'', address:'', city:'', state:'', zip:'',
+        mobiReviewed:'',
         dispenseValidated: false, noBuildNeeded: false,
         onelinkLocDesc:'', onelinkLocCode:'', onelinkCostCenter:'', glString:'', dea:'', stateLicense:'', onelinkRequesterId:'',
         mainSupplyingPharmacy:'', supplyingRxLocCode:'', currentDispenseLogic:'', dispenseLogicCorrect:'', correctDispenseLogic:'',
@@ -301,7 +302,8 @@ function makeDept() {
         otherPyxis:'', otherRefrigerators:'', otherFloorStocks:'', roomsBeds:'', missingSupplyPharmacies:'',
         onelinkNotInScope: false,
         performsRecharges:'', requestorId:'', sharedInventory:'', sharedDepts:[], sharedDeptsOther:'', currentLocations:'',
-        orderDays:'', orderFrequency:'', orderTime:'', futureAdditions:'', comments:''
+        orderDays:'', orderFrequency:'', orderTime:'', futureAdditions:'', comments:'',
+        infoCorrect:'', infoModified:''
     };
 }
 
@@ -370,16 +372,45 @@ function getCompleted() {
     try { return JSON.parse(localStorage.getItem('ipip-completed') || '{}'); }
     catch { return {}; }
 }
+function isDeptConfirmed(d) {
+    return d.infoCorrect === 'Yes' || d.infoModified === 'Yes';
+}
 function markCompleted(depts) {
     const map = getCompleted();
     depts.forEach(d => {
-        if (d.region && d.location && d.department) {
-            const key = `${d.region}||${d.location}`;
-            if (!map[key]) map[key] = [];
-            if (!map[key].includes(d.department)) map[key].push(d.department);
-        }
+        if (!d.region || !d.location || !d.department) return;
+        if (!isDeptConfirmed(d)) return;
+        const key = `${d.region}||${d.location}`;
+        if (!map[key]) map[key] = [];
+        if (!map[key].includes(d.department)) map[key].push(d.department);
     });
     localStorage.setItem('ipip-completed', JSON.stringify(map));
+}
+
+// ============ PARTIAL-SUBMISSION CACHE ============
+// Stores the full dept data for departments submitted but not yet confirmed
+// (both confirmation answers were "No"), keyed by region||location||department.
+// When the user later picks that same department, fields prefill from here.
+function getPendingDrafts() {
+    try { return JSON.parse(localStorage.getItem('ipip-pending-drafts') || '{}'); }
+    catch { return {}; }
+}
+function savePendingDrafts(depts) {
+    const map = getPendingDrafts();
+    depts.forEach(d => {
+        if (!d.region || !d.location || !d.department) return;
+        const key = `${d.region}||${d.location}||${d.department}`;
+        if (isDeptConfirmed(d)) {
+            delete map[key];
+        } else {
+            map[key] = d;
+        }
+    });
+    localStorage.setItem('ipip-pending-drafts', JSON.stringify(map));
+}
+function getPendingDraft(region, location, department) {
+    if (!region || !location || !department) return null;
+    return getPendingDrafts()[`${region}||${location}||${department}`] || null;
 }
 function isDeptCompleted(region, location, department) {
     const map = getCompleted();
@@ -478,12 +509,27 @@ function handleDepartmentChange(i, value) {
     } else {
         clearDeptAutoFields(d);
     }
+    // If this dept was previously submitted-but-not-confirmed, restore the prior responses
+    // so the user can pick up where they left off.
+    const draft = getPendingDraft(d.region, d.location, value);
+    if (draft) {
+        Object.keys(draft).forEach(k => {
+            if (k !== 'region' && k !== 'location' && k !== 'department') d[k] = draft[k];
+        });
+        toast('Restored your prior responses for this department.');
+    }
     renderSurvey();
 }
 function handleOnelinkScopeChange(i, checked) {
     const d = surveyDepts[i];
     d.onelinkNotInScope = checked;
-    if (checked) clearOneLinkFields(d);
+    if (checked) {
+        clearOneLinkFields(d);
+    } else if (d.mainSupplyingPharmacy) {
+        // Refill OneLink fields from the previously-selected Main Supplying Pharmacy
+        // so unchecking the box (e.g., after a misclick) restores the autofill.
+        fillPharmacy(d, d.mainSupplyingPharmacy);
+    }
     renderSurvey();
 }
 function handleMainPharmacyChange(i, value) {
@@ -544,9 +590,12 @@ function renderDeptForm(d, i) {
                 <div class="form-group"><label class="required">State</label><input type="text" class="autofill-field" data-req="dept-${i}" value="${esc(d.state)}" ${onch(i,'state')} placeholder="Auto-fills or type manually" /></div>
                 <div class="form-group"><label class="required">Zip Code</label><input type="text" class="autofill-field" data-req="dept-${i}" value="${esc(d.zip)}" ${onch(i,'zip')} placeholder="Auto-fills or type manually" /></div>
             </div>
-            <div class="form-row">
-                <div class="check-row"><input type="checkbox" id="dispVal-${i}" ${d.dispenseValidated?'checked':''} ${onchk(i,'dispenseValidated')} /><label for="dispVal-${i}">Check if Department dispense info is validated</label></div>
-                <div class="check-row"><input type="checkbox" id="noBuild-${i}" ${d.noBuildNeeded?'checked':''} ${onchk(i,'noBuildNeeded')} /><label for="noBuild-${i}">Check if no build is needed for this Department</label></div>
+            <div class="form-group">
+                <label class="required">Was this department reviewed during the MOBI Willow Inventory Project?</label>
+                <div class="radio-group" data-req-radio="dept-${i}" data-field="mobi-${i}">
+                    <label><input type="radio" name="mobi-${i}" value="Yes" ${d.mobiReviewed==='Yes'?'checked':''} onchange="${sd(i,'mobiReviewed')}=this.value" /> Yes</label>
+                    <label><input type="radio" name="mobi-${i}" value="No" ${d.mobiReviewed==='No'?'checked':''} onchange="${sd(i,'mobiReviewed')}=this.value" /> No</label>
+                </div>
             </div>
         </div>
 
@@ -589,7 +638,7 @@ function renderDeptForm(d, i) {
         <div class="section-body">
             <div class="check-row" style="background:#fffbeb; border:1px solid #f6ad55;">
                 <input type="checkbox" id="onelinkOOS-${i}" ${d.onelinkNotInScope?'checked':''} onchange="handleOnelinkScopeChange(${i}, this.checked)" />
-                <label for="onelinkOOS-${i}"><strong>Check only if OneLink location is NOT in scope for IPIP</strong></label>
+                <label for="onelinkOOS-${i}"><strong>Check only if OneLink location is NOT in scope for IPIP (i.e. this OneLink location does not receive meds from and/or send meds to inpatient pharmacies)</strong></label>
             </div>
             <p class="text-muted mb-2">${d.onelinkNotInScope ? 'OneLink fields are not required since the location is out of scope.' : 'All fields below auto-fill based on the Main Supplying Pharmacy selected above. You can edit them if needed.'}</p>
             <div class="form-row-3">
@@ -703,7 +752,34 @@ function renderDeptForm(d, i) {
                 </div>
             </div>
         </div>
+
+        <div class="section-header">Confirmation</div>
+        <div class="section-body">
+            <div class="form-group">
+                <label class="required">I confirm that the existing department information above is correct and no system updates are required</label>
+                <div class="radio-group" data-req-radio="dept-${i}" data-field="infoCorrect-${i}">
+                    <label><input type="radio" name="infoCorrect-${i}" value="Yes" ${d.infoCorrect==='Yes'?'checked':''} onchange="handleInfoCorrectChange(${i},'Yes')" /> Yes</label>
+                    <label><input type="radio" name="infoCorrect-${i}" value="No" ${d.infoCorrect==='No'?'checked':''} onchange="handleInfoCorrectChange(${i},'No')" /> No</label>
+                </div>
+            </div>
+            ${d.infoCorrect === 'No' ? `
+            <div class="form-group">
+                <label class="required">I confirm the above department information has been modified and is correct</label>
+                <div class="radio-group" data-req-radio="dept-${i}" data-field="infoModified-${i}">
+                    <label><input type="radio" name="infoModified-${i}" value="Yes" ${d.infoModified==='Yes'?'checked':''} onchange="${sd(i,'infoModified')}=this.value" /> Yes</label>
+                    <label><input type="radio" name="infoModified-${i}" value="No" ${d.infoModified==='No'?'checked':''} onchange="${sd(i,'infoModified')}=this.value" /> No</label>
+                </div>
+                <div class="completion-hint">If both are "No", your responses are saved and you can come back later to finish — the green check next to this department will appear once one of them is "Yes".</div>
+            </div>
+            ` : ''}
+        </div>
     </div>`;
+}
+
+function handleInfoCorrectChange(i, value) {
+    surveyDepts[i].infoCorrect = value;
+    if (value === 'Yes') surveyDepts[i].infoModified = '';
+    renderSurvey();
 }
 
 function toggleMulti(i, field, value, checked) {
@@ -764,6 +840,7 @@ async function submitSurvey() {
             const result = await flowPost(URLS.submit, data);
             if (result.success) {
                 markCompleted(surveyDepts);
+                savePendingDrafts(surveyDepts);
                 showSuccessScreen(nameVal, now, surveyDepts.length);
             } else {
                 toast('Submission failed: ' + (result.error || 'Unknown error'), true);
