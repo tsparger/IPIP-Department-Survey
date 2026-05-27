@@ -706,7 +706,7 @@ function renderDeptForm(d, i) {
                     <input type="text" class="autofill-field" data-req="dept-${i}" value="${esc(d.onelinkRequesterId)}" ${onch(i,'onelinkRequesterId')} placeholder="Auto-filled from Main Supplying Pharmacy" />
                 </div>
             </div>
-            <div class="form-group"><label class="required">Current Dispense Logic Hierarchy <span style="font-weight:normal; color:#4a5568;">(a listing of all medication dispensing locations in descending order by availability including pyxis machines, floor stocks, pharmacies, etc.)</span></label>
+            <div class="form-group"><label class="required">Current Dispense Logic Hierarchy <span style="font-weight:normal; color:#4a5568;">(a listing of medication dispensing locations in descending order by availability including pyxis machines, floor stocks, pharmacies, etc.)</span></label>
                 <textarea class="autofill-field" data-req="dept-${i}" readonly rows="${Math.max((d.currentDispenseLogic||'').split('\n').length, 4)}" style="overflow-y:hidden;" placeholder="Auto-filled from selected Department">${esc(d.currentDispenseLogic)}</textarea>
                 <div class="lock-callout" style="background:#ebf8ff;border-color:#90cdf4;color:#2c5282;">Some locations may be listed more than once due to special considerations not described here (ex: narcotics only, breast milk, home infusion).</div>
             </div>
