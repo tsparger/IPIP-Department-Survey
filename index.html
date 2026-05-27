@@ -302,7 +302,7 @@ function makeDept() {
         mainSupplyingPharmacy:'', supplyingRxLocCode:'', currentDispenseLogic:'', dispenseLogicCorrect:'', correctDispenseLogic:'',
         numPyxis:'', numNonPyxis:'', numDispensingPharmacies:'', fillingPharmacies:'',
         otherPyxis:'', otherRefrigerators:'', otherFloorStocks:'', crashCarts:'', roomsBeds:'', missingSupplyPharmacies:'',
-        floorStocks: [],
+        floorStocks: [{name:'', locked:'', rooms:[], otherRooms:''}],
         onelinkNotInScope: false,
         performsRecharges:'', requestorId:'', onelinkRechargesComments:'', sharedInventory:'', sharedDepts:[], sharedDeptsOther:'', currentLocations:'',
         orderDays:'', orderFrequency:'', orderTime:[], futureAdditions:'', comments:'',
@@ -375,6 +375,14 @@ function getPharmacyRow(pharmacy) {
     const data = _data();
     if (!data || !data.onelink || !data.onelink.byPharmacy) return null;
     return data.onelink.byPharmacy[pharmacy] || null;
+}
+function handleNumPyxisChange(i, value) {
+    const prev = parseInt(surveyDepts[i].numPyxis || '0', 10);
+    const curr = parseInt(value || '0', 10);
+    surveyDepts[i].numPyxis = value;
+    // Only re-render when the "is otherPyxis required" state actually flips,
+    // so users typing in numPyxis don't lose focus on every keystroke commit.
+    if ((prev > 0) !== (curr > 0)) renderSurvey();
 }
 function getRoomsForDept(region, deptDisplay) {
     const data = _data();
@@ -773,7 +781,7 @@ function renderDeptForm(d, i) {
         <div class="section-header">Equipment & Pharmacy Counts</div>
         <div class="section-body">
             <div class="form-row-4">
-                <div class="form-group"><label class="required">Number of Pyxis Machines in this Department</label><input type="number" data-req="dept-${i}" value="${esc(d.numPyxis)}" ${onch(i,'numPyxis')} min="0" /></div>
+                <div class="form-group"><label class="required">Number of Pyxis Machines in this Department</label><input type="number" data-req="dept-${i}" value="${esc(d.numPyxis)}" onchange="handleNumPyxisChange(${i}, this.value)" min="0" /></div>
                 <div class="form-group"><label class="required">Number of Non-Pyxis Medication Storage Areas (including pharmacy managed floorstock, refrigerators, freezers, etc)</label><input type="number" data-req="dept-${i}" value="${esc(d.numNonPyxis)}" ${onch(i,'numNonPyxis')} min="0" /></div>
                 <div class="form-group"><label class="required">Number of Inpatient Dispensing Pharmacies (including main and satellite pharmacies)</label><input type="number" data-req="dept-${i}" value="${esc(d.numDispensingPharmacies)}" ${onch(i,'numDispensingPharmacies')} min="0" /></div>
                 <div class="form-group"><label>Filling Pharmacies (other than Main)</label><input type="text" value="${esc(d.fillingPharmacies)}" ${onch(i,'fillingPharmacies')} /></div>
@@ -782,9 +790,12 @@ function renderDeptForm(d, i) {
 
         <div class="section-header">Inventory Details</div>
         <div class="section-body">
-            <div class="form-group"><label>List Pyxis Machines dispensing to this department</label>
-                <textarea ${onch(i,'otherPyxis')} placeholder="e.g., ICU1 IP RX PYXIS, ICU2 IP RX PYXIS, MEDSUG1 IP RX PYXIS, MEDSURG2 IP RX PYXIS, ...">${esc(d.otherPyxis)}</textarea>
-            </div>
+            ${(() => {
+                const pyxisRequired = parseInt(d.numPyxis || '0', 10) > 0;
+                return `<div class="form-group"><label class="${pyxisRequired?'required':''}">List Pyxis Machines dispensing to this department</label>
+                    <textarea ${pyxisRequired?`data-req="dept-${i}"`:''} ${onch(i,'otherPyxis')} placeholder="e.g., ICU1 IP RX PYXIS, ICU2 IP RX PYXIS, MEDSUG1 IP RX PYXIS, MEDSURG2 IP RX PYXIS, ...">${esc(d.otherPyxis)}</textarea>
+                </div>`;
+            })()}
             <div class="form-group">
                 <label>List Crash Carts in this department</label>
                 <textarea ${onch(i,'crashCarts')} placeholder="e.g., ED BAY 1 Crash Cart, L&amp;D Room 1 Crash Cart, ...">${esc(d.crashCarts)}</textarea>
