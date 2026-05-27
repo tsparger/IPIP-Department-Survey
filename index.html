@@ -116,7 +116,7 @@
             .form-row, .form-row-3, .form-row-4 { grid-template-columns: 1fr; }
         }
     </style>
-    <script src="survey-data.js"></script>
+    <script src="survey-data.js?v=20260527b"></script>
 </head>
 <body>
 
@@ -645,10 +645,16 @@ function renderDeptForm(d, i) {
                 <div class="form-group">
                     <label class="required">Department</label>
                     <input type="text" data-req="dept-${i}" list="dept-list-${i}" value="${esc(d.department)}" ${(!d.region || !d.location)?'disabled':''} placeholder="${(d.region && d.location)?'Type to search or click the arrow':'Select Location first'}" onchange="handleDepartmentChange(${i}, this.value)" />
-                    ${(d.region && d.location) ? `<datalist id="dept-list-${i}">${getDepartmentsForLocation(d.region, d.location).map(dep => {
-                        const prefix = isDeptCompleted(d.region, d.location, dep) ? '✅ ' : '';
-                        return `<option value="${esc(prefix + dep)}"></option>`;
-                    }).join('')}</datalist>` : ''}
+                    ${(d.region && d.location) ? (() => {
+                        const depts = getDepartmentsForLocation(d.region, d.location);
+                        if (depts.length === 0) {
+                            return `<div class="completion-hint completion-partial">⚠ No departments available in the dropdown for this location. The location string may be from an outdated draft — try clearing this field and re-picking from the Location dropdown. If the issue persists, contact the survey administrator.</div>`;
+                        }
+                        return `<datalist id="dept-list-${i}">${depts.map(dep => {
+                            const prefix = isDeptCompleted(d.region, d.location, dep) ? '✅ ' : '';
+                            return `<option value="${esc(prefix + dep)}"></option>`;
+                        }).join('')}</datalist>`;
+                    })() : ''}
                     ${departmentStatus(d.region, d.location, d.department)}
                 </div>
             </div>
@@ -1022,6 +1028,19 @@ function init() {
     checkAdmin();
     if (URLS.submit) document.getElementById('api-url-submit').value = URLS.submit;
     document.getElementById('public-survey-link').textContent = location.origin + location.pathname;
+    // Diagnostic banner: if the data file didn't load, the rest of the survey
+    // is useless. Surface this to the user (and to anyone debugging from the
+    // outside) so we don't fail silently.
+    if (typeof SURVEY_DATA === 'undefined' || !SURVEY_DATA || !SURVEY_DATA.regions) {
+        const headerCard = document.getElementById('survey-header-card');
+        if (headerCard) {
+            const banner = document.createElement('div');
+            banner.className = 'lock-callout';
+            banner.style.cssText = 'background:#fed7d7;border-color:#e53e3e;color:#742a2a;margin-bottom:12px;';
+            banner.innerHTML = '<strong>Survey data failed to load.</strong> The Region, Location, and Department dropdowns will be empty until this is fixed. If you\\'re behind a corporate proxy or VPN that may be blocking the data file, try a different network. Otherwise contact the survey administrator.';
+            headerCard.insertBefore(banner, headerCard.firstChild);
+        }
+    }
     restoreActiveDraft();
     renderSurvey();
     // Restore the respondent name AFTER the initial render so the DOM exists.
