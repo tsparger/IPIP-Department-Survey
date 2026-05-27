@@ -759,6 +759,10 @@ function renderDeptForm(d, i) {
                 <textarea ${onch(i,'otherPyxis')} placeholder="e.g., ICU1 IP RX PYXIS, ICU2 IP RX PYXIS, MEDSUG1 IP RX PYXIS, MEDSURG2 IP RX PYXIS, ...">${esc(d.otherPyxis)}</textarea>
             </div>
             <div class="form-group">
+                <label>List Crash Carts in this department</label>
+                <textarea ${onch(i,'crashCarts')} placeholder="e.g., ED BAY 1 Crash Cart, L&amp;D Room 1 Crash Cart, ...">${esc(d.crashCarts)}</textarea>
+            </div>
+            <div class="form-group">
                 <label>List Refrigerators dispensing to this department</label>
                 <div class="lock-callout">IMPORTANT: Please indicate whether each refrigerator is <strong>LOCKED</strong> or <strong>UNLOCKED</strong></div>
                 <textarea ${onch(i,'otherRefrigerators')} placeholder="e.g., Unit A Fridge - LOCKED, Unit B Fridge - UNLOCKED, ...">${esc(d.otherRefrigerators)}</textarea>
@@ -767,10 +771,6 @@ function renderDeptForm(d, i) {
                 <label>List Floor Stocks dispensing to this department</label>
                 <div class="lock-callout">IMPORTANT: Please indicate whether each floor stock is <strong>LOCKED</strong> or <strong>UNLOCKED</strong></div>
                 <textarea ${onch(i,'otherFloorStocks')} placeholder="e.g., Pharmacy floor stock - locked, Materials Management floor stock - unlocked, ...">${esc(d.otherFloorStocks)}</textarea>
-            </div>
-            <div class="form-group">
-                <label>List Crash Carts in this department</label>
-                <textarea ${onch(i,'crashCarts')} placeholder="e.g., ED BAY 1 Crash Cart, L&amp;D Room 1 Crash Cart, ...">${esc(d.crashCarts)}</textarea>
             </div>
             <div class="form-row">
                 <div class="form-group"><label class="required">Which rooms, beds, Care Areas/Hallways do the floor stock service?</label>
