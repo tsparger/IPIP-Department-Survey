@@ -718,7 +718,7 @@ function renderDeptForm(d, i) {
                         <label><input type="radio" name="dispLogic-${i}" value="No" ${d.dispenseLogicCorrect==='No'?'checked':''} onchange="handleDispLogicChange(${i},'No')" /> No</label>
                     </div>
                 </div>
-                <div class="form-group"><label class="${d.dispenseLogicCorrect==='No'?'required':''}">List missing/additional dispensing locations to be added to dispense logic, describe any considerations to this location</label>
+                <div class="form-group"><label class="${d.dispenseLogicCorrect==='No'?'required':''}">List missing/additional dispensing locations to be added to dispense logic and describe any considerations to this location.</label>
                     <textarea ${d.dispenseLogicCorrect==='No'?`data-req="dept-${i}"`:''} ${d.dispenseLogicCorrect==='No'?onch(i,'correctDispenseLogic'):''} class="${d.dispenseLogicCorrect==='No'?'':'disabled-field'}" ${d.dispenseLogicCorrect==='No'?'':'readonly'} placeholder="${d.dispenseLogicCorrect==='No'?'e.g., PACU 2 Pyxis — only narcotics are dispensed here, ...':'Select No above to enable this field'}">${esc(d.correctDispenseLogic)}</textarea>
                 </div>
             </div>
