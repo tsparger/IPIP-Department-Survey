@@ -749,9 +749,8 @@ function renderDeptForm(d, i) {
             </div>
         </div>
 
-        <div class="section-header">Recharges & Shared Inventory</div>
+        <div class="section-header">Recharging Inventory</div>
         <div class="section-body">
-            <div style="font-weight:600; color:#003B71; font-size:13px; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">OneLink Recharges of Non-Inpatient Departments / Clinics</div>
             <div class="form-row">
                 <div class="form-group">
                     <label class="required">Do you perform recharges in OneLink when medications are sent to/from Shared/Associated NON-inpatient Departments/Clinics?</label>
@@ -765,35 +764,34 @@ function renderDeptForm(d, i) {
                     <input type="text" value="${esc(d.requestorId)}" ${d.performsRecharges==='Yes'?`data-req="dept-${i}"`:''} class="${reqClass}" ${reqReadonly} ${reqDisabled?'':`onchange="${sd(i,'requestorId')}=this.value"`} placeholder="${reqDisabled?'Select Yes for recharges to enable this field':'Enter Requestor ID...'}" />
                 </div>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="margin-top:8px;">
+                <label class="${d.sharedInventory==='Yes'?'required':''}">Shared/Associated Non-Inpatient Departments and Clinics serviced by the inpatient pharmacy</label>
+                ${(() => {
+                    if (!(d.region && d.location)) {
+                        return `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">Select a Region and Location above first to see available departments.</div>`;
+                    }
+                    const otherDepts = getDepartmentsForLocation(d.region, d.location).filter(dep => dep !== d.department);
+                    const otherInput = `<input type="text" placeholder="Other (free text) - type additional departments..." ${onch(i,'sharedDeptsOther')} value="${esc(d.sharedDeptsOther||'')}" />`;
+                    if (otherDepts.length === 0) {
+                        return `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">No other departments listed at this location. Use the "Other" box below to add any shared/associated departments or clinics.</div>${otherInput}`;
+                    }
+                    return `<div class="multi-select">${otherDepts.map(opt => `<label><input type="checkbox" ${(d.sharedDepts||[]).includes(opt)?'checked':''} onchange="toggleMulti(${i},'sharedDepts','${esc(opt)}',this.checked)" /> ${esc(opt)}</label>`).join('')}</div>${otherInput}`;
+                })()}
+            </div>
+            <div class="form-group" style="margin-top:8px;">
                 <label>Comments for OneLink Recharges of Shared/Associated NON-inpatient Departments and Clinics serviced by the inpatient pharmacy (e.g. IP pharmacy compounding for and dispensing to infusion clinics, ONC pharmacy compounding for and dispensing to admitted IP patients)</label>
                 <textarea ${onch(i,'onelinkRechargesComments')} placeholder="Optional — add any context about OneLink recharges for non-inpatient departments/clinics...">${esc(d.onelinkRechargesComments)}</textarea>
             </div>
-
-            <div style="font-weight:600; color:#003B71; font-size:13px; text-transform:uppercase; letter-spacing:0.5px; margin: 20px 0 8px; padding-top:14px; border-top:1px solid #cbd5e0;">Shared Inventory</div>
-            <div class="form-group">
-                <label class="required">Is any Medication Inventory shared with other Departments?</label>
-                <div class="radio-group" data-req-radio="dept-${i}" data-field="shared-${i}">
-                    <label><input type="radio" name="shared-${i}" value="Yes" ${d.sharedInventory==='Yes'?'checked':''} onchange="handleSharedChange(${i},'Yes')" /> Yes</label>
-                    <label><input type="radio" name="shared-${i}" value="No" ${d.sharedInventory==='No'?'checked':''} onchange="handleSharedChange(${i},'No')" /> No</label>
-                </div>
-            </div>
-            <div class="form-row">
+            <div class="form-row" style="margin-top:8px;">
                 <div class="form-group">
-                    <label class="${d.sharedInventory==='Yes'?'required':''}">Shared/Associated Non-Inpatient Departments and Clinics serviced by the inpatient pharmacy</label>
-                    ${(() => {
-                        if (!(d.region && d.location)) {
-                            return `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">Select a Region and Location above first to see available departments.</div>`;
-                        }
-                        const otherDepts = getDepartmentsForLocation(d.region, d.location).filter(dep => dep !== d.department);
-                        const otherInput = `<input type="text" placeholder="Other (free text) - type additional departments..." ${onch(i,'sharedDeptsOther')} value="${esc(d.sharedDeptsOther||'')}" />`;
-                        if (otherDepts.length === 0) {
-                            return `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">No other departments listed at this location. Use the "Other" box below to add any shared/associated departments or clinics.</div>${otherInput}`;
-                        }
-                        return `<div class="multi-select">${otherDepts.map(opt => `<label><input type="checkbox" ${(d.sharedDepts||[]).includes(opt)?'checked':''} onchange="toggleMulti(${i},'sharedDepts','${esc(opt)}',this.checked)" /> ${esc(opt)}</label>`).join('')}</div>${otherInput}`;
-                    })()}
+                    <label class="required">Is any Medication Inventory shared with other Departments?</label>
+                    <div class="radio-group" data-req-radio="dept-${i}" data-field="shared-${i}">
+                        <label><input type="radio" name="shared-${i}" value="Yes" ${d.sharedInventory==='Yes'?'checked':''} onchange="handleSharedChange(${i},'Yes')" /> Yes</label>
+                        <label><input type="radio" name="shared-${i}" value="No" ${d.sharedInventory==='No'?'checked':''} onchange="handleSharedChange(${i},'No')" /> No</label>
+                    </div>
                 </div>
-                <div class="form-group"><label class="${d.sharedInventory==='Yes'?'required':''}">Current Location(s) that store products</label>
+                <div class="form-group">
+                    <label class="${d.sharedInventory==='Yes'?'required':''}">Current Location(s) that store products</label>
                     <textarea ${d.sharedInventory==='Yes'?`data-req="dept-${i}"`:''} class="${d.sharedInventory==='Yes'?'':'disabled-field'}" ${d.sharedInventory==='Yes'?'':'readonly'} ${d.sharedInventory==='Yes'?onch(i,'currentLocations'):''} placeholder="${d.sharedInventory==='Yes'?'List current locations...':'Select Yes for shared inventory above to enable this field'}">${esc(d.currentLocations)}</textarea>
                 </div>
             </div>
