@@ -448,6 +448,22 @@ function restoreActiveDraft() {
         if (!raw) return;
         const draft = JSON.parse(raw);
         if (Array.isArray(draft.surveyDepts) && draft.surveyDepts.length) {
+            // If the saved location no longer exists in the current data
+            // (e.g., it was renamed or removed in a data update), clear the
+            // stale location/department so the user re-picks instead of being
+            // stuck with an empty department dropdown.
+            const data = _data();
+            draft.surveyDepts.forEach(d => {
+                if (d.region && d.location && data && data.departments && data.departments[d.region]) {
+                    if (!data.departments[d.region][d.location]) {
+                        d.location = '';
+                        d.department = '';
+                    } else if (d.department) {
+                        const valid = data.departments[d.region][d.location].some(x => x.dept === d.department);
+                        if (!valid) d.department = '';
+                    }
+                }
+            });
             surveyDepts = draft.surveyDepts;
         }
         // Respondent name is restored after init() finishes the first render.
