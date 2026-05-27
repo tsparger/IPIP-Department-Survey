@@ -644,16 +644,18 @@ function renderDeptForm(d, i) {
                 </div>
                 <div class="form-group">
                     <label class="required">Department</label>
-                    <input type="text" data-req="dept-${i}" list="dept-list-${i}" value="${esc(d.department)}" ${(!d.region || !d.location)?'disabled':''} placeholder="${(d.region && d.location)?'Type to search or click the arrow':'Select Location first'}" onchange="handleDepartmentChange(${i}, this.value)" />
+                    <input type="text" data-req="dept-${i}" list="dept-list-${i}" value="${esc(d.department)}" ${(!d.region || !d.location)?'disabled':''} placeholder="${(d.region && d.location)?'Type to search or click the arrow':'Select Location first'}" oninput="handleDepartmentChange(${i}, this.value)" onchange="handleDepartmentChange(${i}, this.value)" />
                     ${(d.region && d.location) ? (() => {
                         const depts = getDepartmentsForLocation(d.region, d.location);
                         if (depts.length === 0) {
                             return `<div class="completion-hint completion-partial">⚠ No departments available in the dropdown for this location. The location string may be from an outdated draft — try clearing this field and re-picking from the Location dropdown. If the issue persists, contact the survey administrator.</div>`;
                         }
-                        return `<datalist id="dept-list-${i}">${depts.map(dep => {
+                        const optsHtml = depts.map(dep => {
                             const prefix = isDeptCompleted(d.region, d.location, dep) ? '✅ ' : '';
                             return `<option value="${esc(prefix + dep)}"></option>`;
-                        }).join('')}</datalist>`;
+                        }).join('');
+                        const select = `<select onchange="handleDepartmentChange(${i}, this.value); this.value=''" style="margin-top:6px;"><option value="">-- Pick a department from the full list --</option>${depts.map(dep => `<option value="${esc(dep)}">${esc(dep)}</option>`).join('')}</select>`;
+                        return `<datalist id="dept-list-${i}">${optsHtml}</datalist><div class="text-muted" style="margin:4px 0 0; font-size:12px;">${depts.length} department${depts.length===1?'':'s'} available. If the type-to-search dropdown is empty, use this fallback list instead:</div>${select}`;
                     })() : ''}
                     ${departmentStatus(d.region, d.location, d.department)}
                 </div>
