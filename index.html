@@ -116,7 +116,7 @@
             .form-row, .form-row-3, .form-row-4 { grid-template-columns: 1fr; }
         }
     </style>
-    <script src="survey-data.js?v=20260527b"></script>
+    <script src="survey-data.js?v=20260527c"></script>
 </head>
 <body>
 
@@ -374,6 +374,17 @@ function getPharmacyRow(pharmacy) {
     const data = _data();
     if (!data || !data.onelink || !data.onelink.byPharmacy) return null;
     return data.onelink.byPharmacy[pharmacy] || null;
+}
+function getDeptsInSameCityForLocation(region, location, currentDept) {
+    // All dept-location entries (in-scope + out-of-scope) in the same city
+    // as the picked location, minus the user's currently-selected dept.
+    const data = _data();
+    if (!data || !data.locationToCity || !data.departmentsByCity) return [];
+    const city = (data.locationToCity[region] || {})[location];
+    if (!city) return [];
+    const entries = (data.departmentsByCity[region] || {})[city] || [];
+    const currentEntry = currentDept ? `${currentDept} — ${location}` : null;
+    return entries.filter(e => e !== currentEntry);
 }
 
 // ============ COMPLETION TRACKING (per-browser) ============
@@ -792,12 +803,15 @@ function renderDeptForm(d, i) {
                     if (!(d.region && d.location)) {
                         return `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">Select a Region and Location above first to see available departments.</div>`;
                     }
-                    const otherDepts = getDepartmentsForLocation(d.region, d.location).filter(dep => dep !== d.department);
+                    const otherEntries = getDeptsInSameCityForLocation(d.region, d.location, d.department);
                     const otherInput = `<input type="text" placeholder="Other (free text) - type additional departments..." ${onch(i,'sharedDeptsOther')} value="${esc(d.sharedDeptsOther||'')}" />`;
-                    if (otherDepts.length === 0) {
-                        return `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">No other departments listed at this location. Use the "Other" box below to add any shared/associated departments or clinics.</div>${otherInput}`;
+                    if (otherEntries.length === 0) {
+                        return `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">No other departments listed in this city. Use the "Other" box below to add any shared/associated departments or clinics.</div>${otherInput}`;
                     }
-                    return `<div class="multi-select">${otherDepts.map(opt => `<label><input type="checkbox" ${(d.sharedDepts||[]).includes(opt)?'checked':''} onchange="toggleMulti(${i},'sharedDepts','${esc(opt)}',this.checked)" /> ${esc(opt)}</label>`).join('')}</div>${otherInput}`;
+                    const _d = _data();
+                    const _city = (_d && _d.locationToCity && _d.locationToCity[d.region] || {})[d.location] || '';
+                    const cityHint = _city ? `<div class="text-muted" style="margin:0 0 4px; font-size:12px;">Showing all inpatient and outpatient departments in ${esc(_city)} (${otherEntries.length} total).</div>` : '';
+                    return `${cityHint}<div class="multi-select">${otherEntries.map(opt => `<label><input type="checkbox" ${(d.sharedDepts||[]).includes(opt)?'checked':''} onchange="toggleMulti(${i},'sharedDepts','${esc(opt)}',this.checked)" /> ${esc(opt)}</label>`).join('')}</div>${otherInput}`;
                 })()}
             </div>
             <div class="form-group" style="margin-top:8px;">
