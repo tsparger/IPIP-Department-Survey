@@ -384,6 +384,15 @@ function handleNumPyxisChange(i, value) {
     // so users typing in numPyxis don't lose focus on every keystroke commit.
     if ((prev > 0) !== (curr > 0)) renderSurvey();
 }
+function handleFloorStockNameChange(i, j, value) {
+    const fs = surveyDepts[i].floorStocks[j];
+    const prevFilled = !!(fs.name && fs.name.trim());
+    fs.name = value;
+    const currFilled = !!(value && value.trim());
+    // Re-render only when name crosses empty/non-empty so the Locked + Rooms
+    // required indicators appear/disappear without flashing on every keystroke.
+    if (prevFilled !== currFilled) renderSurvey();
+}
 function getRoomsForDept(region, deptDisplay) {
     const data = _data();
     if (!data || !data.roomsByDept) return [];
@@ -809,9 +818,10 @@ function renderDeptForm(d, i) {
                 <div class="lock-callout">For each floor stock: enter the name, mark it <strong>LOCKED</strong> or <strong>UNLOCKED</strong>, and select the rooms / beds / care areas it services. Use the free-text box for any care areas or hallways not in the room list.</div>
                 ${(d.floorStocks || []).map((fs, j) => {
                     const rooms = getRoomsForDept(d.region, d.department);
+                    const fsRequired = !!(fs.name && fs.name.trim());
                     const roomsBlock = rooms.length === 0
                         ? `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">No rooms on file for this department — list every room/care area in the free-text box below.</div>`
-                        : `<div class="multi-select" style="max-height:200px;">${rooms.map(r => `<label><input type="checkbox" ${(fs.rooms||[]).includes(r)?'checked':''} onchange="toggleFloorStockRoom(${i}, ${j}, '${esc(r)}', this.checked)" /> ${esc(r)}</label>`).join('')}</div>`;
+                        : `<div class="multi-select" data-fs-rooms="dept-${i}-fs-${j}" style="max-height:200px;">${rooms.map(r => `<label><input type="checkbox" ${(fs.rooms||[]).includes(r)?'checked':''} onchange="toggleFloorStockRoom(${i}, ${j}, '${esc(r)}', this.checked)" /> ${esc(r)}</label>`).join('')}</div>`;
                     return `
                     <div style="border:1px solid #cbd5e0; border-radius:8px; padding:12px; margin-bottom:10px; background:white;">
                         <div class="flex-between mb-2">
@@ -821,20 +831,20 @@ function renderDeptForm(d, i) {
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Floor Stock Name</label>
-                                <input type="text" value="${esc(fs.name||'')}" oninput="surveyDepts[${i}].floorStocks[${j}].name=this.value" onchange="surveyDepts[${i}].floorStocks[${j}].name=this.value" placeholder="e.g., Pharmacy Floor Stock, Materials Management FS" />
+                                <input type="text" value="${esc(fs.name||'')}" oninput="surveyDepts[${i}].floorStocks[${j}].name=this.value" onchange="handleFloorStockNameChange(${i}, ${j}, this.value)" placeholder="e.g., Pharmacy Floor Stock, Materials Management FS" />
                             </div>
                             <div class="form-group">
-                                <label>Locked or Unlocked?</label>
-                                <div class="radio-group">
+                                <label class="${fsRequired?'required':''}">Locked or Unlocked?</label>
+                                <div class="radio-group" data-fs-locked="dept-${i}-fs-${j}">
                                     <label><input type="radio" name="fslocked-${i}-${j}" value="Locked" ${fs.locked==='Locked'?'checked':''} onchange="surveyDepts[${i}].floorStocks[${j}].locked='Locked'" /> Locked</label>
                                     <label><input type="radio" name="fslocked-${i}-${j}" value="Unlocked" ${fs.locked==='Unlocked'?'checked':''} onchange="surveyDepts[${i}].floorStocks[${j}].locked='Unlocked'" /> Unlocked</label>
                                 </div>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>Rooms / Beds / Care Areas serviced by this floor stock</label>
+                            <label class="${fsRequired?'required':''}">Rooms / Beds / Care Areas serviced by this floor stock</label>
                             ${roomsBlock}
-                            <input type="text" value="${esc(fs.otherRooms||'')}" oninput="surveyDepts[${i}].floorStocks[${j}].otherRooms=this.value" onchange="surveyDepts[${i}].floorStocks[${j}].otherRooms=this.value" placeholder="Other care areas / hallways — free text" style="margin-top:6px;" />
+                            <input type="text" data-fs-other-rooms="dept-${i}-fs-${j}" value="${esc(fs.otherRooms||'')}" oninput="surveyDepts[${i}].floorStocks[${j}].otherRooms=this.value" onchange="surveyDepts[${i}].floorStocks[${j}].otherRooms=this.value" placeholder="Other care areas / hallways — free text" style="margin-top:6px;" />
                         </div>
                     </div>`;
                 }).join('')}
@@ -989,6 +999,26 @@ function validateSurvey() {
             const otGroup = document.querySelector(`[data-orderTime="dept-${i}"]`);
             if (otGroup) { otGroup.style.border = ''; otGroup.style.borderRadius = ''; otGroup.style.padding = '4px 0'; }
         }
+        // Floor stocks: if name is filled in, both Locked/Unlocked and Rooms are required
+        (d.floorStocks || []).forEach((fs, j) => {
+            const lockedGroup = document.querySelector(`[data-fs-locked="dept-${i}-fs-${j}"]`);
+            const roomsBox = document.querySelector(`[data-fs-rooms="dept-${i}-fs-${j}"]`);
+            const otherRoomsInput = document.querySelector(`[data-fs-other-rooms="dept-${i}-fs-${j}"]`);
+            const clearBorder = el => { if (el) { el.style.border = ''; el.style.borderRadius = ''; el.style.padding = ''; } };
+            clearBorder(lockedGroup); clearBorder(roomsBox); if (otherRoomsInput) otherRoomsInput.classList.remove('field-error');
+            if (!fs.name || !fs.name.trim()) return;
+            if (!fs.locked || !fs.locked.trim()) {
+                if (lockedGroup) { lockedGroup.style.border = '2px solid #e53e3e'; lockedGroup.style.borderRadius = '6px'; lockedGroup.style.padding = '4px 8px'; }
+                errors.push(`Department ${i+1}, Floor Stock ${j+1}: select Locked or Unlocked.`);
+            }
+            const hasRoomPick = Array.isArray(fs.rooms) && fs.rooms.length > 0;
+            const hasOtherRooms = fs.otherRooms && fs.otherRooms.trim();
+            if (!hasRoomPick && !hasOtherRooms) {
+                if (roomsBox) { roomsBox.style.border = '2px solid #e53e3e'; roomsBox.style.borderRadius = '6px'; }
+                if (otherRoomsInput) otherRoomsInput.classList.add('field-error');
+                errors.push(`Department ${i+1}, Floor Stock ${j+1}: select at least one room or fill in the free-text box.`);
+            }
+        });
     });
     return [...new Set(errors)];
 }
