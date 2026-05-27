@@ -635,11 +635,16 @@ function renderDeptForm(d, i) {
                 </div>
                 <div class="form-group">
                     <label class="required">Location</label>
-                    <input type="text" data-req="dept-${i}" list="loc-list-${i}" value="${esc(d.location)}" ${!d.region?'disabled':''} placeholder="${d.region?'Type to search or click the arrow':'Select Region first'}" onchange="handleLocationChange(${i}, this.value)" />
-                    ${d.region ? `<datalist id="loc-list-${i}">${getLocationsForRegion(d.region).map(loc => {
-                        const prefix = isLocationCompleted(d.region, loc) ? '✅ ' : '';
-                        return `<option value="${esc(prefix + loc)}"></option>`;
-                    }).join('')}</datalist>` : ''}
+                    <input type="text" data-req="dept-${i}" list="loc-list-${i}" value="${esc(d.location)}" ${!d.region?'disabled':''} placeholder="${d.region?'Type to search or click the arrow':'Select Region first'}" oninput="handleLocationChange(${i}, this.value)" onchange="handleLocationChange(${i}, this.value)" />
+                    ${d.region ? (() => {
+                        const locs = getLocationsForRegion(d.region);
+                        const optsHtml = locs.map(loc => {
+                            const prefix = isLocationCompleted(d.region, loc) ? '✅ ' : '';
+                            return `<option value="${esc(prefix + loc)}"></option>`;
+                        }).join('');
+                        const select = `<select onchange="handleLocationChange(${i}, this.value); this.value=''" style="margin-top:6px;"><option value="">-- Pick a location from the full list --</option>${locs.map(loc => `<option value="${esc(loc)}">${esc(loc)}</option>`).join('')}</select>`;
+                        return `<datalist id="loc-list-${i}">${optsHtml}</datalist><div class="text-muted" style="margin:4px 0 0; font-size:12px;">${locs.length} location${locs.length===1?'':'s'} available. If the type-to-search dropdown is empty, use this fallback list instead:</div>${select}`;
+                    })() : ''}
                     ${locationStatus(d.region, d.location)}
                 </div>
                 <div class="form-group">
