@@ -851,7 +851,7 @@ function renderDeptForm(d, i) {
                 <button type="button" class="btn btn-secondary btn-sm" onclick="addFloorStock(${i})" style="margin-top:4px;">+ Add Floor Stock</button>
             </div>
             <div class="form-group">
-                <label>Filling Pharmacies that stock this Department's Pyxis Machine, Floor Stock, and meds delivered to bedside (other than Main, such as ONC pharmacies, SAT pharmacies, etc.)</label>
+                <label>List other filling pharmacies that stock this Department's Pyxis Machine, Floor Stock, and/or fill meds delivered to bedside (other than Main pharmacy, such as ONC pharmacies, SAT pharmacies, etc.)</label>
                 <input type="text" value="${esc(d.fillingPharmacies)}" ${onch(i,'fillingPharmacies')} />
             </div>
             <div class="form-group">
