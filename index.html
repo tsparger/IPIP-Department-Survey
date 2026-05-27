@@ -715,7 +715,7 @@ function renderDeptForm(d, i) {
                 <div class="form-group"><label class="required">Zip Code</label><input type="text" class="autofill-field" data-req="dept-${i}" value="${esc(d.zip)}" ${onch(i,'zip')} placeholder="Auto-fills or type manually" /></div>
             </div>
             <div class="form-group">
-                <label class="required">Was this department reviewed during the MOBI Willow Inventory Project?</label>
+                <label class="required">Was this department reviewed during the Medical Office Building Inventory (MOBI) Willow Inventory Project?</label>
                 <div class="radio-group" data-req-radio="dept-${i}" data-field="mobi-${i}">
                     <label><input type="radio" name="mobi-${i}" value="Yes" ${d.mobiReviewed==='Yes'?'checked':''} onchange="${sd(i,'mobiReviewed')}=this.value" /> Yes</label>
                     <label><input type="radio" name="mobi-${i}" value="No" ${d.mobiReviewed==='No'?'checked':''} onchange="${sd(i,'mobiReviewed')}=this.value" /> No</label>
@@ -747,7 +747,7 @@ function renderDeptForm(d, i) {
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label class="required">Are all dispensing locations for this department listed?</label>
+                    <label class="required">Are all dispensing locations for this department listed above in the Current Dispense Logic Hierarchy?</label>
                     <div class="radio-group" data-req-radio="dept-${i}" data-field="dispLogic-${i}">
                         <label><input type="radio" name="dispLogic-${i}" value="Yes" ${d.dispenseLogicCorrect==='Yes'?'checked':''} onchange="handleDispLogicChange(${i},'Yes')" /> Yes</label>
                         <label><input type="radio" name="dispLogic-${i}" value="No" ${d.dispenseLogicCorrect==='No'?'checked':''} onchange="handleDispLogicChange(${i},'No')" /> No</label>
