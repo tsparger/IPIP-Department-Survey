@@ -116,7 +116,7 @@
             .form-row, .form-row-3, .form-row-4 { grid-template-columns: 1fr; }
         }
     </style>
-    <script src="survey-data.js?v=20260527f"></script>
+    <script src="survey-data.js?v=20260527g"></script>
 </head>
 <body>
 
@@ -302,6 +302,7 @@ function makeDept() {
         mainSupplyingPharmacy:'', supplyingRxLocCode:'', currentDispenseLogic:'', dispenseLogicCorrect:'', correctDispenseLogic:'',
         numPyxis:'', numNonPyxis:'', numDispensingPharmacies:'', fillingPharmacies:'',
         otherPyxis:'', otherRefrigerators:'', otherFloorStocks:'', crashCarts:'', roomsBeds:'', missingSupplyPharmacies:'',
+        floorStocks: [],
         onelinkNotInScope: false,
         performsRecharges:'', requestorId:'', onelinkRechargesComments:'', sharedInventory:'', sharedDepts:[], sharedDeptsOther:'', currentLocations:'',
         orderDays:'', orderFrequency:'', orderTime:[], futureAdditions:'', comments:'',
@@ -374,6 +375,32 @@ function getPharmacyRow(pharmacy) {
     const data = _data();
     if (!data || !data.onelink || !data.onelink.byPharmacy) return null;
     return data.onelink.byPharmacy[pharmacy] || null;
+}
+function getRoomsForDept(region, deptDisplay) {
+    const data = _data();
+    if (!data || !data.roomsByDept) return [];
+    const short = (deptDisplay || '').split(' - ', 1)[0].trim();
+    if (!short) return [];
+    return (data.roomsByDept[region] || {})[short] || [];
+}
+function addFloorStock(i) {
+    const d = surveyDepts[i];
+    if (!Array.isArray(d.floorStocks)) d.floorStocks = [];
+    d.floorStocks.push({name:'', locked:'', rooms:[], otherRooms:''});
+    renderSurvey();
+}
+function removeFloorStock(i, j) {
+    surveyDepts[i].floorStocks.splice(j, 1);
+    renderSurvey();
+}
+function toggleFloorStockRoom(i, j, room, checked) {
+    const fs = surveyDepts[i].floorStocks[j];
+    if (!fs.rooms) fs.rooms = [];
+    if (checked) {
+        if (!fs.rooms.includes(room)) fs.rooms.push(room);
+    } else {
+        fs.rooms = fs.rooms.filter(r => r !== room);
+    }
 }
 function getDeptsInSameCityForLocation(region, location, currentDept) {
     // All dept-location entries (in-scope + out-of-scope) in the same city
@@ -769,16 +796,43 @@ function renderDeptForm(d, i) {
             </div>
             <div class="form-group">
                 <label>List Floor Stocks dispensing to this department</label>
-                <div class="lock-callout">IMPORTANT: Please indicate whether each floor stock is <strong>LOCKED</strong> or <strong>UNLOCKED</strong></div>
-                <textarea ${onch(i,'otherFloorStocks')} placeholder="e.g., Pharmacy floor stock - locked, Materials Management floor stock - unlocked, ...">${esc(d.otherFloorStocks)}</textarea>
+                <div class="lock-callout">For each floor stock: enter the name, mark it <strong>LOCKED</strong> or <strong>UNLOCKED</strong>, and select the rooms / beds / care areas it services. Use the free-text box for any care areas or hallways not in the room list.</div>
+                ${(d.floorStocks || []).map((fs, j) => {
+                    const rooms = getRoomsForDept(d.region, d.department);
+                    const roomsBlock = rooms.length === 0
+                        ? `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">No rooms on file for this department — list every room/care area in the free-text box below.</div>`
+                        : `<div class="multi-select" style="max-height:200px;">${rooms.map(r => `<label><input type="checkbox" ${(fs.rooms||[]).includes(r)?'checked':''} onchange="toggleFloorStockRoom(${i}, ${j}, '${esc(r)}', this.checked)" /> ${esc(r)}</label>`).join('')}</div>`;
+                    return `
+                    <div style="border:1px solid #cbd5e0; border-radius:8px; padding:12px; margin-bottom:10px; background:white;">
+                        <div class="flex-between mb-2">
+                            <strong style="color:#003B71;">Floor Stock ${j+1}</strong>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="removeFloorStock(${i}, ${j})">Remove</button>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Floor Stock Name</label>
+                                <input type="text" value="${esc(fs.name||'')}" oninput="surveyDepts[${i}].floorStocks[${j}].name=this.value" onchange="surveyDepts[${i}].floorStocks[${j}].name=this.value" placeholder="e.g., Pharmacy Floor Stock, Materials Management FS" />
+                            </div>
+                            <div class="form-group">
+                                <label>Locked or Unlocked?</label>
+                                <div class="radio-group">
+                                    <label><input type="radio" name="fslocked-${i}-${j}" value="Locked" ${fs.locked==='Locked'?'checked':''} onchange="surveyDepts[${i}].floorStocks[${j}].locked='Locked'" /> Locked</label>
+                                    <label><input type="radio" name="fslocked-${i}-${j}" value="Unlocked" ${fs.locked==='Unlocked'?'checked':''} onchange="surveyDepts[${i}].floorStocks[${j}].locked='Unlocked'" /> Unlocked</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Rooms / Beds / Care Areas serviced by this floor stock</label>
+                            ${roomsBlock}
+                            <input type="text" value="${esc(fs.otherRooms||'')}" oninput="surveyDepts[${i}].floorStocks[${j}].otherRooms=this.value" onchange="surveyDepts[${i}].floorStocks[${j}].otherRooms=this.value" placeholder="Other care areas / hallways — free text" style="margin-top:6px;" />
+                        </div>
+                    </div>`;
+                }).join('')}
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addFloorStock(${i})" style="margin-top:4px;">+ Add Floor Stock</button>
             </div>
-            <div class="form-row">
-                <div class="form-group"><label class="required">Which rooms, beds, Care Areas/Hallways do the floor stock service?</label>
-                    <textarea data-req="dept-${i}" ${onch(i,'roomsBeds')} placeholder="List rooms, beds, care areas...">${esc(d.roomsBeds)}</textarea>
-                </div>
-                <div class="form-group"><label>List missing/additional Supply Pharmacies and other Non-Pyxis dispensing locations (including satellites, floor stocks, refrigerators - state locked/unlocked)</label>
-                    <textarea ${onch(i,'missingSupplyPharmacies')} placeholder="List any missing or additional locations...">${esc(d.missingSupplyPharmacies)}</textarea>
-                </div>
+            <div class="form-group">
+                <label>List missing/additional Supply Pharmacies and other Non-Pyxis dispensing locations (including satellites, floor stocks, refrigerators - state locked/unlocked)</label>
+                <textarea ${onch(i,'missingSupplyPharmacies')} placeholder="List any missing or additional locations...">${esc(d.missingSupplyPharmacies)}</textarea>
             </div>
         </div>
 
