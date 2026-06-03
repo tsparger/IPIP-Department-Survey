@@ -851,11 +851,11 @@ function renderDeptForm(d, i) {
                 <button type="button" class="btn btn-secondary btn-sm" onclick="addFloorStock(${i})" style="margin-top:4px;">+ Add Floor Stock</button>
             </div>
             <div class="form-group">
-                <label>List other filling pharmacies that stock this Department's Pyxis Machine, Floor Stock, and/or fill meds delivered to bedside (other than Main pharmacy, such as ONC pharmacies, SAT pharmacies, etc.)</label>
+                <label>List other filling pharmacies that stock this Department's Pyxis Machine, Floor Stock, and/or Patient Med Cassettes (other than Main pharmacy, such as ONC pharmacies, SAT pharmacies, etc.)</label>
                 <input type="text" value="${esc(d.fillingPharmacies)}" ${onch(i,'fillingPharmacies')} />
             </div>
             <div class="form-group">
-                <label>List missing/additional Supply Pharmacies and other Non-Pyxis dispensing locations (including satellites, floor stocks, refrigerators - state locked/unlocked)</label>
+                <label>List missing/additional Supply Pharmacies and other Non-Pyxis dispensing sublocations (including satellites, floor stocks, freezers - state locked/unlocked, refrigerators - state locked/unlocked)</label>
                 <textarea ${onch(i,'missingSupplyPharmacies')} placeholder="List any missing or additional locations...">${esc(d.missingSupplyPharmacies)}</textarea>
             </div>
         </div>
