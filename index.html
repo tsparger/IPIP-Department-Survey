@@ -724,7 +724,7 @@ function renderDeptForm(d, i) {
                 <div class="form-group"><label class="required">Zip Code</label><input type="text" class="autofill-field" data-req="dept-${i}" value="${esc(d.zip)}" ${onch(i,'zip')} placeholder="Auto-fills or type manually" /></div>
             </div>
             <div class="form-group">
-                <label class="required">Was this department reviewed during the Medical Office Building Inventory (MOBI) Willow Inventory Project?</label>
+                <label class="required">Was this department apart of the Medical Office Building Inventory (MOBI) deployment?</label>
                 <div class="radio-group" data-req-radio="dept-${i}" data-field="mobi-${i}">
                     <label><input type="radio" name="mobi-${i}" value="Yes" ${d.mobiReviewed==='Yes'?'checked':''} onchange="${sd(i,'mobiReviewed')}=this.value" /> Yes</label>
                     <label><input type="radio" name="mobi-${i}" value="No" ${d.mobiReviewed==='No'?'checked':''} onchange="${sd(i,'mobiReviewed')}=this.value" /> No</label>
@@ -772,7 +772,7 @@ function renderDeptForm(d, i) {
         <div class="section-body">
             <div class="check-row" style="background:#fffbeb; border:1px solid #f6ad55;">
                 <input type="checkbox" id="onelinkOOS-${i}" ${d.onelinkNotInScope?'checked':''} onchange="handleOnelinkScopeChange(${i}, this.checked)" />
-                <label for="onelinkOOS-${i}"><strong>Check only if OneLink location is NOT in scope for IPIP (i.e. this OneLink location does not receive meds from and/or send meds to inpatient pharmacies)</strong></label>
+                <label for="onelinkOOS-${i}"><strong>Check only if this department DOES NOT receive meds from Inpatient Pharmacy (out of scope for IPIP).</strong></label>
             </div>
             <p class="text-muted mb-2">${d.onelinkNotInScope ? 'OneLink fields are not required since the location is out of scope.' : 'All fields below auto-fill based on the Main Supplying Pharmacy selected above. You can edit them if needed.'}</p>
             <div class="form-row-3">
@@ -791,7 +791,7 @@ function renderDeptForm(d, i) {
         <div class="section-body">
             <div class="form-row-3">
                 <div class="form-group"><label class="required">Number of Pyxis Machines in this Department</label><input type="number" data-req="dept-${i}" value="${esc(d.numPyxis)}" onchange="handleNumPyxisChange(${i}, this.value)" min="0" /></div>
-                <div class="form-group"><label class="required">Number of Non-Pyxis Medication Storage Areas (including pharmacy managed floorstock, refrigerators, freezers, etc)</label><input type="number" data-req="dept-${i}" value="${esc(d.numNonPyxis)}" ${onch(i,'numNonPyxis')} min="0" /></div>
+                <div class="form-group"><label class="required">Number of non-Pyxis Medication storage areas (including floorstock, non-remote-manager-refrigerators, freezers, etc)</label><input type="number" data-req="dept-${i}" value="${esc(d.numNonPyxis)}" ${onch(i,'numNonPyxis')} min="0" /></div>
                 <div class="form-group"><label class="required">Number of Inpatient Dispensing Pharmacies (including main and satellite pharmacies)</label><input type="number" data-req="dept-${i}" value="${esc(d.numDispensingPharmacies)}" ${onch(i,'numDispensingPharmacies')} min="0" /></div>
             </div>
         </div>
