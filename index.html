@@ -216,9 +216,14 @@
 // ============ CONFIG ============
 const EMBEDDED_FLOW_URL = 'https://997e87e2062feb52af5c332a27e4b4.0d.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/ff587e61873d410a9b6af00baf0a2312/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=6nBKlVvqUmMixeFvw0HQHb01V_DNrgIpSS-37oZFE14';
 const EMBEDDED_GET_RESPONSES_URL = 'https://997e87e2062feb52af5c332a27e4b4.0d.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/b37313ea930749d8857f40d8a4f515cf/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=xs21v76AzcUerV0duk79qhgNQdHzUp-TygfaT7FBDcw';
+// "Get Department Detail" flow (GET, takes ?region=&location=&department=, returns the
+// most-recent full row for that one department). Leave blank until the flow is built —
+// while blank, per-department server prefill is simply skipped (no-op, nothing breaks).
+const EMBEDDED_DETAIL_URL = '';
 let URLS = JSON.parse(localStorage.getItem('ipip-flow-urls') || '{}');
 if (EMBEDDED_FLOW_URL) URLS.submit = EMBEDDED_FLOW_URL;
 if (EMBEDDED_GET_RESPONSES_URL) URLS.responses = EMBEDDED_GET_RESPONSES_URL;
+if (EMBEDDED_DETAIL_URL) URLS.detail = EMBEDDED_DETAIL_URL;
 let remoteCompleted = {};
 let surveyDepts = [];
 
@@ -477,6 +482,68 @@ function getPendingDraft(region, location, department) {
     return getPendingDrafts()[`${region}||${location}||${department}`] || null;
 }
 
+// ============ SERVER-SIDE PREFILL ============
+// When a department was already submitted (by anyone, on any device), pull its
+// full record from the "Get Department Detail" flow and repopulate the form.
+// SharePoint stores PascalCase columns (see Flow1-SubmitSurvey.md); the form
+// model uses camelCase, so we map column -> field here. Plain string fields that
+// round-trip unchanged live in this table; the few serialized fields (booleans,
+// joined arrays, floor stocks) are handled explicitly below.
+const SP_FIELD_MAP = {
+    Specialty:'specialty', Address:'address', City:'city', State:'state', Zip:'zip',
+    MobiReviewed:'mobiReviewed',
+    OneLinkLocDesc:'onelinkLocDesc', OneLinkLocCode:'onelinkLocCode', OneLinkCostCenter:'onelinkCostCenter',
+    GLString:'glString', DEA:'dea', StateLicense:'stateLicense',
+    MainSupplyingPharmacy:'mainSupplyingPharmacy', SupplyingRxLocCode:'supplyingRxLocCode', OneLinkRequesterId:'onelinkRequesterId',
+    CurrentDispenseLogic:'currentDispenseLogic', DispenseLogicCorrect:'dispenseLogicCorrect', CorrectDispenseLogic:'correctDispenseLogic',
+    NumPyxis:'numPyxis', NumNonPyxis:'numNonPyxis', NumDispensingPharmacies:'numDispensingPharmacies',
+    FillingPharmacies:'fillingPharmacies',
+    OtherPyxis:'otherPyxis', OtherRefrigerators:'otherRefrigerators', OtherFloorStocks:'otherFloorStocks',
+    CrashCarts:'crashCarts', RoomsBeds:'roomsBeds', MissingSupplyPharmacies:'missingSupplyPharmacies',
+    PerformsRecharges:'performsRecharges', RequestorID:'requestorId', OneLinkRechargesComments:'onelinkRechargesComments',
+    SharedInventory:'sharedInventory', SharedDeptsOther:'sharedDeptsOther', CurrentLocations:'currentLocations',
+    OrderDays:'orderDays', OrderFrequency:'orderFrequency',
+    FutureAdditions:'futureAdditions', Comments:'comments',
+    InfoCorrect:'infoCorrect', InfoModified:'infoModified'
+};
+
+// Reverse the "name (Locked) - Rooms: a, b - Other: x" line format the Submit
+// flow writes for each floor stock back into the structured array the form uses.
+// Locked is constrained to Locked/Unlocked/empty, so we anchor on it — that lets
+// floor-stock names safely contain parentheses.
+function parseFloorStocks(text) {
+    if (!text || !String(text).trim()) return [{name:'', locked:'', rooms:[], otherRooms:''}];
+    return String(text).split('\n').filter(l => l.trim()).map(line => {
+        const m = line.match(/^(.*) \((Locked|Unlocked|)\) - Rooms: ([\s\S]*?) - Other: ([\s\S]*)$/);
+        if (!m) return {name: line.trim(), locked:'', rooms:[], otherRooms:''};
+        const rooms = m[3].split(',').map(s => s.trim()).filter(Boolean);
+        return {name: m[1].trim(), locked: m[2].trim(), rooms, otherRooms: m[4].trim()};
+    });
+}
+
+function mapRemoteRowToDept(d, row) {
+    Object.keys(SP_FIELD_MAP).forEach(col => {
+        if (col in row && row[col] != null) d[SP_FIELD_MAP[col]] = String(row[col]);
+    });
+    if ('OneLinkNotInScope' in row) d.onelinkNotInScope = (row.OneLinkNotInScope === 'Yes' || row.OneLinkNotInScope === true);
+    if (row.SharedDepts) d.sharedDepts = String(row.SharedDepts).split(';').map(s => s.trim()).filter(Boolean);
+    if (row.OrderTime) d.orderTime = String(row.OrderTime).split(';').map(s => s.trim()).filter(Boolean);
+    if ('FloorStocks' in row) d.floorStocks = parseFloorStocks(row.FloorStocks);
+}
+
+// Targeted, single-department lookup — keeps the payload to one row so it stays
+// well under the sync-trigger timeout that forced Flow 4 to slim down.
+async function fetchDeptDetail(region, location, department) {
+    if (!URLS.detail) return null;
+    const q = `region=${encodeURIComponent(region)}&location=${encodeURIComponent(location)}&department=${encodeURIComponent(department)}`;
+    const sep = URLS.detail.includes('?') ? '&' : '?';
+    const result = await flowGet(URLS.detail + sep + q, 15000);
+    if (!result) return null;
+    if (result.detail) return result.detail;                                  // {detail:{...}}
+    if (Array.isArray(result.responses) && result.responses.length) return result.responses[0]; // {responses:[...]}
+    return null;
+}
+
 // ============ ACTIVE-DRAFT AUTOSAVE ============
 // Persist the in-progress surveyDepts array and respondent name on every change
 // so that an unexpected refresh, browser sleep, or page reload restores the
@@ -616,7 +683,7 @@ function handleLocationChange(i, value) {
     }
     renderSurvey();
 }
-function handleDepartmentChange(i, value) {
+async function handleDepartmentChange(i, value) {
     value = value.replace(/^[✓✅]\s*/, '');
     const d = surveyDepts[i];
     d.department = value;
@@ -641,6 +708,22 @@ function handleDepartmentChange(i, value) {
         toast('Restored your prior responses for this department.');
     }
     renderSurvey();
+    // No local draft for this department, but it may already be submitted by
+    // someone else (or on another device). Pull the full record from the detail
+    // flow and prefill so the surveyor reviews/updates instead of re-keying.
+    if (!draft && URLS.detail && value) {
+        const region = d.region, location = d.location, department = value;
+        try {
+            const row = await fetchDeptDetail(region, location, department);
+            // The fetch is async; only apply if this slot still holds the same
+            // department (guard against the user switching it mid-request).
+            if (row && surveyDepts[i] && surveyDepts[i].department === department) {
+                mapRemoteRowToDept(surveyDepts[i], row);
+                renderSurvey();
+                toast('Loaded previously submitted responses for this department.');
+            }
+        } catch (e) { /* silent — survey still works without prefill */ }
+    }
 }
 function handleOnelinkScopeChange(i, checked) {
     const d = surveyDepts[i];
