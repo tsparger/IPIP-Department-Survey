@@ -309,7 +309,7 @@ function makeDept() {
         onelinkLocDesc:'', onelinkLocCode:'', onelinkCostCenter:'', glString:'', dea:'', stateLicense:'', onelinkRequesterId:'',
         mainSupplyingPharmacy:'', supplyingRxLocCode:'', currentDispenseLogic:'', dispenseLogicCorrect:'', correctDispenseLogic:'',
         numPyxis:'', numNonPyxis:'', numDispensingPharmacies:'', fillingPharmacies:'',
-        otherPyxis:'', otherRefrigerators:'', otherFloorStocks:'', crashCarts:'', roomsBeds:'', missingSupplyPharmacies:'',
+        otherPyxis:'', otherRefrigerators:'', otherFreezers:'', otherFloorStocks:'', crashCarts:'', roomsBeds:'', missingSupplyPharmacies:'',
         floorStocks: [{name:'', remoteManaged:'', rooms:[], otherRooms:''}],
         onelinkNotInScope: false,
         performsRecharges:'', requestorId:'', onelinkRechargesComments:'', sharedInventory:'', sharedDepts:[], sharedDeptsOther:'', currentLocations:'',
@@ -837,8 +837,8 @@ function renderDeptForm(d, i) {
                     <input type="text" class="autofill-field" data-req="dept-${i}" value="${esc(d.onelinkRequesterId)}" ${onch(i,'onelinkRequesterId')} placeholder="Auto-filled from Main Supplying Pharmacy" />
                 </div>
             </div>
-            <div class="form-group"><label class="required">Current Dispense Logic Hierarchy <span style="font-weight:normal; color:#4a5568;">(a listing of medication dispensing locations in descending order by availability including pyxis machines, floor stocks, pharmacies, etc.)</span></label>
-                <textarea class="autofill-field" data-req="dept-${i}" readonly rows="${Math.max((d.currentDispenseLogic||'').split('\n').length, 4)}" style="overflow-y:hidden;" placeholder="Auto-filled from selected Department">${esc(d.currentDispenseLogic)}</textarea>
+            <div class="form-group"><label>Current Dispense Logic Hierarchy <span style="font-weight:normal; color:#4a5568;">(a listing of medication dispensing locations in descending order by availability including pyxis machines, floor stocks, pharmacies, etc.)</span></label>
+                <textarea class="autofill-field" readonly rows="${Math.max((d.currentDispenseLogic||'').split('\n').length, 4)}" style="overflow-y:hidden;" placeholder="Auto-filled from selected Department">${esc(d.currentDispenseLogic)}</textarea>
                 <div class="lock-callout" style="background:#ebf8ff;border-color:#90cdf4;color:#2c5282;">Some locations may be listed more than once due to special considerations not described here (ex: narcotics only, breast milk, home infusion).</div>
             </div>
             <div class="form-row">
@@ -849,7 +849,7 @@ function renderDeptForm(d, i) {
                         <label><input type="radio" name="dispLogic-${i}" value="No" ${d.dispenseLogicCorrect==='No'?'checked':''} onchange="handleDispLogicChange(${i},'No')" /> No</label>
                     </div>
                 </div>
-                <div class="form-group"><label class="${d.dispenseLogicCorrect==='No'?'required':''}">List missing/additional dispensing locations to be added to Dispense Logic Hierarchy, and describe any considerations to this location</label>
+                <div class="form-group"><label class="${d.dispenseLogicCorrect==='No'?'required':''}">List missing/additional dispensing locations to be added to Dispense Logic Hierarchy, and describe any considerations to this location (e.g. Pyxis machines, Satellite pharmacies, Floor stocks)</label>
                     <textarea ${d.dispenseLogicCorrect==='No'?`data-req="dept-${i}"`:''} ${d.dispenseLogicCorrect==='No'?onch(i,'correctDispenseLogic'):''} class="${d.dispenseLogicCorrect==='No'?'':'disabled-field'}" ${d.dispenseLogicCorrect==='No'?'':'readonly'} placeholder="${d.dispenseLogicCorrect==='No'?'e.g., PACU 2 Pyxis — only narcotics are dispensed here, ...':'Select No above to enable this field'}">${esc(d.correctDispenseLogic)}</textarea>
                 </div>
             </div>
@@ -859,7 +859,7 @@ function renderDeptForm(d, i) {
         <div class="section-body">
             <div class="check-row" style="background:#fffbeb; border:1px solid #f6ad55;">
                 <input type="checkbox" id="onelinkOOS-${i}" ${d.onelinkNotInScope?'checked':''} onchange="handleOnelinkScopeChange(${i}, this.checked)" />
-                <label for="onelinkOOS-${i}"><strong>Check only if this department DOES NOT receive meds from Inpatient Pharmacy (out of scope for IPIP).</strong></label>
+                <label for="onelinkOOS-${i}"><strong>Check only if this department does NOT receive meds from Inpatient Pharmacy and does not need inpatient pharmacy medication inventory tracking (i.e. out of scope for IPIP)</strong></label>
             </div>
             <p class="text-muted mb-2">${d.onelinkNotInScope ? 'OneLink fields are not required since the location is out of scope.' : 'All fields below auto-fill based on the Main Supplying Pharmacy selected above. You can edit them if needed.'}</p>
             <div class="form-row-3">
@@ -874,34 +874,25 @@ function renderDeptForm(d, i) {
             </div>
         </div>
 
-        <div class="section-header">Equipment & Pharmacy Counts</div>
-        <div class="section-body">
-            <div class="form-row-3">
-                <div class="form-group"><label class="required">Number of Pyxis Machines in this Department</label><input type="number" data-req="dept-${i}" value="${esc(d.numPyxis)}" onchange="handleNumPyxisChange(${i}, this.value)" min="0" /></div>
-                <div class="form-group"><label class="required">Number of non-Pyxis Medication storage areas (including floorstock, non-remote-manager-refrigerators, freezers, etc)</label><input type="number" data-req="dept-${i}" value="${esc(d.numNonPyxis)}" ${onch(i,'numNonPyxis')} min="0" /></div>
-                <div class="form-group"><label class="required">Number of Inpatient Dispensing Pharmacies (including main and satellite pharmacies)</label><input type="number" data-req="dept-${i}" value="${esc(d.numDispensingPharmacies)}" ${onch(i,'numDispensingPharmacies')} min="0" /></div>
-            </div>
-        </div>
-
         <div class="section-header">Inventory Details</div>
         <div class="section-body">
-            ${(() => {
-                const pyxisRequired = parseInt(d.numPyxis || '0', 10) > 0;
-                return `<div class="form-group"><label class="${pyxisRequired?'required':''}">List Pyxis Machines dispensing to this department</label>
-                    <textarea ${pyxisRequired?`data-req="dept-${i}"`:''} ${onch(i,'otherPyxis')} placeholder="e.g., ICU1 IP RX PYXIS, ICU2 IP RX PYXIS, MEDSUG1 IP RX PYXIS, MEDSURG2 IP RX PYXIS, ...">${esc(d.otherPyxis)}</textarea>
-                </div>`;
-            })()}
+            <div class="form-group"><label>List NON-Profiled Pyxis Machines dispensing to this department</label>
+                <textarea ${onch(i,'otherPyxis')} placeholder="e.g., ICU1 IP RX PYXIS, ICU2 IP RX PYXIS, MEDSUG1 IP RX PYXIS, MEDSURG2 IP RX PYXIS, ...">${esc(d.otherPyxis)}</textarea>
+            </div>
             <div class="form-group">
                 <label>List Crash Carts in this department</label>
                 <textarea ${onch(i,'crashCarts')} placeholder="e.g., ED BAY 1 Crash Cart, L&amp;D Room 1 Crash Cart, ...">${esc(d.crashCarts)}</textarea>
             </div>
             <div class="form-group">
-                <label>List Refrigerators dispensing to this department</label>
-                <div class="lock-callout">IMPORTANT: Please indicate whether each refrigerator is <strong>LOCKED</strong> or <strong>UNLOCKED</strong></div>
-                <textarea ${onch(i,'otherRefrigerators')} placeholder="e.g., Unit A Fridge - LOCKED, Unit B Fridge - UNLOCKED, ...">${esc(d.otherRefrigerators)}</textarea>
+                <label>List med refrigerators dispensing to this department that are NOT managed by Remote Manager.</label>
+                <textarea ${onch(i,'otherRefrigerators')} placeholder="e.g., Unit A Fridge, Unit B Fridge, ...">${esc(d.otherRefrigerators)}</textarea>
             </div>
             <div class="form-group">
-                <label>List Floor Stocks dispensing to this department</label>
+                <label>List med freezers dispensing to this department that are NOT managed by Remote Manager.</label>
+                <textarea ${onch(i,'otherFreezers')} placeholder="e.g., Unit A Freezer, Unit B Freezer, ...">${esc(d.otherFreezers)}</textarea>
+            </div>
+            <div class="form-group">
+                <label>List med floor stocks dispensing to this department and the respective Rooms/Beds/Care Areas/Departments they service.</label>
                 <div class="lock-callout">For each floor stock: enter the name, indicate whether it is <strong>remote managed</strong>, and select the rooms / beds / care areas it services. Use the free-text box for any care areas or hallways not in the room list.</div>
                 ${(d.floorStocks || []).map((fs, j) => {
                     const rooms = getRoomsForDept(d.region, d.department);
@@ -940,10 +931,6 @@ function renderDeptForm(d, i) {
             <div class="form-group">
                 <label>List other filling pharmacies that stock this Department's Pyxis Machine, Floor Stock, and/or Patient Med Cassettes (other than Main pharmacy, such as ONC pharmacies, SAT pharmacies, etc.)</label>
                 <input type="text" value="${esc(d.fillingPharmacies)}" ${onch(i,'fillingPharmacies')} />
-            </div>
-            <div class="form-group">
-                <label>List missing/additional Supply Pharmacies and other Non-Pyxis dispensing sublocations (including satellites, floor stocks, freezers - state locked/unlocked, refrigerators - state locked/unlocked)</label>
-                <textarea ${onch(i,'missingSupplyPharmacies')} placeholder="List any missing or additional locations...">${esc(d.missingSupplyPharmacies)}</textarea>
             </div>
         </div>
 
