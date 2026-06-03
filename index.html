@@ -219,7 +219,7 @@ const EMBEDDED_GET_RESPONSES_URL = 'https://997e87e2062feb52af5c332a27e4b4.0d.en
 // "Get Department Detail" flow (GET, takes ?region=&location=&department=, returns the
 // most-recent full row for that one department). Leave blank until the flow is built —
 // while blank, per-department server prefill is simply skipped (no-op, nothing breaks).
-const EMBEDDED_DETAIL_URL = '';
+const EMBEDDED_DETAIL_URL = 'https://997e87e2062feb52af5c332a27e4b4.0d.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/007abef82cd54498bd89bf2888c890f5/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=77BZMnesH8AsUeHw5PaWnaQF0_8FYmdqpPCZI6hhEsY';
 let URLS = JSON.parse(localStorage.getItem('ipip-flow-urls') || '{}');
 if (EMBEDDED_FLOW_URL) URLS.submit = EMBEDDED_FLOW_URL;
 if (EMBEDDED_GET_RESPONSES_URL) URLS.responses = EMBEDDED_GET_RESPONSES_URL;
@@ -485,38 +485,56 @@ function getPendingDraft(region, location, department) {
 // ============ SERVER-SIDE PREFILL ============
 // When a department was already submitted (by anyone, on any device), pull its
 // full record from the "Get Department Detail" flow and repopulate the form.
-// SharePoint stores PascalCase columns (see Flow1-SubmitSurvey.md); the form
-// model uses camelCase, so we map column -> field here. Plain string fields that
-// round-trip unchanged live in this table; the few serialized fields (booleans,
-// joined arrays, floor stocks) are handled explicitly below.
+// The "IPIP Responses" list was built from a CSV import, so most columns have
+// generic `field_N` internal names (CSV column order), while 9 columns added
+// later kept friendly names. These keys were confirmed against a live response;
+// see Flow1-SubmitSurvey.md for the original column order. region/location/
+// department (field_3/4/5) are intentionally omitted — they're already set from
+// the dropdown selection, so we don't risk desyncing them with a stored variant.
 const SP_FIELD_MAP = {
-    Specialty:'specialty', Address:'address', City:'city', State:'state', Zip:'zip',
-    MobiReviewed:'mobiReviewed',
-    OneLinkLocDesc:'onelinkLocDesc', OneLinkLocCode:'onelinkLocCode', OneLinkCostCenter:'onelinkCostCenter',
-    GLString:'glString', DEA:'dea', StateLicense:'stateLicense',
-    MainSupplyingPharmacy:'mainSupplyingPharmacy', SupplyingRxLocCode:'supplyingRxLocCode', OneLinkRequesterId:'onelinkRequesterId',
-    CurrentDispenseLogic:'currentDispenseLogic', DispenseLogicCorrect:'dispenseLogicCorrect', CorrectDispenseLogic:'correctDispenseLogic',
-    NumPyxis:'numPyxis', NumNonPyxis:'numNonPyxis', NumDispensingPharmacies:'numDispensingPharmacies',
-    FillingPharmacies:'fillingPharmacies',
-    OtherPyxis:'otherPyxis', OtherRefrigerators:'otherRefrigerators', OtherFloorStocks:'otherFloorStocks',
-    CrashCarts:'crashCarts', RoomsBeds:'roomsBeds', MissingSupplyPharmacies:'missingSupplyPharmacies',
-    PerformsRecharges:'performsRecharges', RequestorID:'requestorId', OneLinkRechargesComments:'onelinkRechargesComments',
-    SharedInventory:'sharedInventory', SharedDeptsOther:'sharedDeptsOther', CurrentLocations:'currentLocations',
-    OrderDays:'orderDays', OrderFrequency:'orderFrequency',
-    FutureAdditions:'futureAdditions', Comments:'comments',
+    field_6:'specialty', field_7:'address', field_8:'city', field_9:'state', field_10:'zip',
+    MOBIReviewed0:'mobiReviewed',
+    field_13:'onelinkLocDesc', field_14:'onelinkLocCode', field_15:'onelinkCostCenter',
+    field_16:'glString', field_17:'dea', field_18:'stateLicense',
+    field_19:'mainSupplyingPharmacy', field_20:'supplyingRxLocCode', OneLinkRequestorID:'onelinkRequesterId',
+    field_21:'currentDispenseLogic', field_22:'dispenseLogicCorrect', field_23:'correctDispenseLogic',
+    field_24:'numPyxis', field_25:'numNonPyxis', field_26:'numDispensingPharmacies',
+    field_27:'fillingPharmacies',
+    field_28:'otherPyxis', field_29:'otherRefrigerators', field_30:'otherFloorStocks',
+    CrashCarts:'crashCarts', field_31:'roomsBeds', field_32:'missingSupplyPharmacies',
+    field_33:'performsRecharges', field_34:'requestorId', OneLinkRechargesComments:'onelinkRechargesComments',
+    field_35:'sharedInventory', SharedDeptsOther:'sharedDeptsOther', field_37:'currentLocations',
+    field_38:'orderDays', field_39:'orderFrequency',
+    field_41:'futureAdditions', field_42:'comments',
     InfoCorrect:'infoCorrect', InfoModified:'infoModified'
 };
 
-// Reverse the "name (Locked) - Rooms: a, b - Other: x" line format the Submit
-// flow writes for each floor stock back into the structured array the form uses.
-// Locked is constrained to Locked/Unlocked/empty, so we anchor on it — that lets
-// floor-stock names safely contain parentheses.
-function parseFloorStocks(text) {
-    if (!text || !String(text).trim()) return [{name:'', locked:'', rooms:[], otherRooms:''}];
-    return String(text).split('\n').filter(l => l.trim()).map(line => {
+// Restore the per-department floor-stock array. Submissions store it as a JSON
+// string (the exact array the form uses), so we parse that directly. As a
+// fallback we also handle the older "name (Locked) - Rooms: a, b - Other: x"
+// text format, anchoring on the Locked/Unlocked marker so names may contain
+// parentheses.
+function parseFloorStocks(raw) {
+    const empty = [{name:'', locked:'', rooms:[], otherRooms:''}];
+    if (!raw || !String(raw).trim()) return empty;
+    const s = String(raw).trim();
+    if (s[0] === '[') {
+        try {
+            const arr = JSON.parse(s);
+            if (Array.isArray(arr) && arr.length) {
+                return arr.map(fs => ({
+                    name: fs.name || '', locked: fs.locked || '',
+                    rooms: Array.isArray(fs.rooms) ? fs.rooms : [],
+                    otherRooms: fs.otherRooms || ''
+                }));
+            }
+            return empty;
+        } catch (e) { /* not JSON after all — fall through to text parsing */ }
+    }
+    return s.split('\n').filter(l => l.trim()).map(line => {
         const m = line.match(/^(.*) \((Locked|Unlocked|)\) - Rooms: ([\s\S]*?) - Other: ([\s\S]*)$/);
         if (!m) return {name: line.trim(), locked:'', rooms:[], otherRooms:''};
-        const rooms = m[3].split(',').map(s => s.trim()).filter(Boolean);
+        const rooms = m[3].split(',').map(x => x.trim()).filter(Boolean);
         return {name: m[1].trim(), locked: m[2].trim(), rooms, otherRooms: m[4].trim()};
     });
 }
@@ -526,8 +544,8 @@ function mapRemoteRowToDept(d, row) {
         if (col in row && row[col] != null) d[SP_FIELD_MAP[col]] = String(row[col]);
     });
     if ('OneLinkNotInScope' in row) d.onelinkNotInScope = (row.OneLinkNotInScope === 'Yes' || row.OneLinkNotInScope === true);
-    if (row.SharedDepts) d.sharedDepts = String(row.SharedDepts).split(';').map(s => s.trim()).filter(Boolean);
-    if (row.OrderTime) d.orderTime = String(row.OrderTime).split(';').map(s => s.trim()).filter(Boolean);
+    if (row.field_36) d.sharedDepts = String(row.field_36).split(';').map(s => s.trim()).filter(Boolean);  // SharedDepts
+    if (row.field_40) d.orderTime = String(row.field_40).split(';').map(s => s.trim()).filter(Boolean);    // OrderTime
     if ('FloorStocks' in row) d.floorStocks = parseFloorStocks(row.FloorStocks);
 }
 
