@@ -310,7 +310,7 @@ function makeDept() {
         mainSupplyingPharmacy:'', supplyingRxLocCode:'', currentDispenseLogic:'', dispenseLogicCorrect:'', correctDispenseLogic:'',
         numPyxis:'', numNonPyxis:'', numDispensingPharmacies:'', fillingPharmacies:'',
         otherPyxis:'', otherRefrigerators:'', otherFreezers:'', otherFloorStocks:'', crashCarts:'', roomsBeds:'', missingSupplyPharmacies:'',
-        floorStocks: [{name:'', remoteManaged:'', rooms:[], otherRooms:''}],
+        floorStocks: [{name:'', remoteManaged:'', rooms:[], allRooms:false, otherRooms:'', shared:'', depts:[], allDepts:false, otherDepts:''}],
         onelinkNotInScope: false,
         performsRecharges:'', requestorId:'', onelinkRechargesComments:'', sharedInventory:'', sharedDepts:[], sharedDeptsOther:'', currentLocations:'',
         orderDays:'', orderFrequency:'', orderTime:[], futureAdditions:'', comments:'',
@@ -397,7 +397,7 @@ function getRoomsForDept(region, deptDisplay) {
 function addFloorStock(i) {
     const d = surveyDepts[i];
     if (!Array.isArray(d.floorStocks)) d.floorStocks = [];
-    d.floorStocks.push({name:'', remoteManaged:'', rooms:[], otherRooms:''});
+    d.floorStocks.push({name:'', remoteManaged:'', rooms:[], allRooms:false, otherRooms:'', shared:'', depts:[], allDepts:false, otherDepts:''});
     renderSurvey();
 }
 function removeFloorStock(i, j) {
@@ -411,6 +411,27 @@ function toggleFloorStockRoom(i, j, room, checked) {
         if (!fs.rooms.includes(room)) fs.rooms.push(room);
     } else {
         fs.rooms = fs.rooms.filter(r => r !== room);
+    }
+}
+function setFloorStockAllRooms(i, j, checked) {
+    surveyDepts[i].floorStocks[j].allRooms = checked;
+    renderSurvey();
+}
+function setFloorStockShared(i, j, value) {
+    surveyDepts[i].floorStocks[j].shared = value;
+    renderSurvey();
+}
+function setFloorStockAllDepts(i, j, checked) {
+    surveyDepts[i].floorStocks[j].allDepts = checked;
+    renderSurvey();
+}
+function toggleFloorStockDept(i, j, dept, checked) {
+    const fs = surveyDepts[i].floorStocks[j];
+    if (!fs.depts) fs.depts = [];
+    if (checked) {
+        if (!fs.depts.includes(dept)) fs.depts.push(dept);
+    } else {
+        fs.depts = fs.depts.filter(x => x !== dept);
     }
 }
 function getDeptsInSameCityForLocation(region, location, currentDept) {
@@ -504,7 +525,7 @@ const SP_FIELD_MAP = {
 // As a last resort we also handle the legacy "name (Locked) - Rooms: a, b - Other: x"
 // text format, anchoring on the marker so names may contain parentheses.
 function parseFloorStocks(raw) {
-    const empty = [{name:'', remoteManaged:'', rooms:[], otherRooms:''}];
+    const empty = [{name:'', remoteManaged:'', rooms:[], allRooms:false, otherRooms:'', shared:'', depts:[], allDepts:false, otherDepts:''}];
     if (!raw || !String(raw).trim()) return empty;
     const s = String(raw).trim();
     if (s[0] === '[') {
@@ -514,7 +535,12 @@ function parseFloorStocks(raw) {
                 return arr.map(fs => ({
                     name: fs.name || '', remoteManaged: fs.remoteManaged || fs.locked || '',
                     rooms: Array.isArray(fs.rooms) ? fs.rooms : [],
-                    otherRooms: fs.otherRooms || ''
+                    allRooms: !!fs.allRooms,
+                    otherRooms: fs.otherRooms || '',
+                    shared: fs.shared || '',
+                    depts: Array.isArray(fs.depts) ? fs.depts : [],
+                    allDepts: !!fs.allDepts,
+                    otherDepts: fs.otherDepts || ''
                 }));
             }
             return empty;
@@ -522,9 +548,9 @@ function parseFloorStocks(raw) {
     }
     return s.split('\n').filter(l => l.trim()).map(line => {
         const m = line.match(/^(.*) \((Locked|Unlocked|)\) - Rooms: ([\s\S]*?) - Other: ([\s\S]*)$/);
-        if (!m) return {name: line.trim(), remoteManaged:'', rooms:[], otherRooms:''};
+        if (!m) return {name: line.trim(), remoteManaged:'', rooms:[], allRooms:false, otherRooms:'', shared:'', depts:[], allDepts:false, otherDepts:''};
         const rooms = m[3].split(',').map(x => x.trim()).filter(Boolean);
-        return {name: m[1].trim(), remoteManaged: m[2].trim(), rooms, otherRooms: m[4].trim()};
+        return {name: m[1].trim(), remoteManaged: m[2].trim(), rooms, allRooms:false, otherRooms: m[4].trim(), shared:'', depts:[], allDepts:false, otherDepts:''};
     });
 }
 
@@ -897,9 +923,15 @@ function renderDeptForm(d, i) {
                 ${(d.floorStocks || []).map((fs, j) => {
                     const rooms = getRoomsForDept(d.region, d.department);
                     const fsRequired = !!(fs.name && fs.name.trim());
+                    const roomsDisabled = !!fs.allRooms;
                     const roomsBlock = rooms.length === 0
                         ? `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">No rooms on file for this department — list every room/care area in the free-text box below.</div>`
-                        : `<div class="multi-select" data-fs-rooms="dept-${i}-fs-${j}" style="max-height:200px;">${rooms.map(r => `<label><input type="checkbox" ${(fs.rooms||[]).includes(r)?'checked':''} onchange="toggleFloorStockRoom(${i}, ${j}, '${esc(r)}', this.checked)" /> ${esc(r)}</label>`).join('')}</div>`;
+                        : `<div class="multi-select" data-fs-rooms="dept-${i}-fs-${j}" style="max-height:200px;${roomsDisabled?'opacity:0.45;pointer-events:none;':''}">${rooms.map(r => `<label><input type="checkbox" ${(fs.rooms||[]).includes(r)?'checked':''} ${roomsDisabled?'disabled':''} onchange="toggleFloorStockRoom(${i}, ${j}, '${esc(r)}', this.checked)" /> ${esc(r)}</label>`).join('')}</div>`;
+                    const otherDepts = getDeptsInSameCityForLocation(d.region, d.location, d.department);
+                    const deptsDisabled = !!fs.allDepts;
+                    const deptsBlock = otherDepts.length === 0
+                        ? `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">No other departments on file for this hospital — list every department in the free-text box below.</div>`
+                        : `<div class="multi-select" data-fs-depts="dept-${i}-fs-${j}" style="max-height:200px;${deptsDisabled?'opacity:0.45;pointer-events:none;':''}">${otherDepts.map(dep => `<label><input type="checkbox" ${(fs.depts||[]).includes(dep)?'checked':''} ${deptsDisabled?'disabled':''} onchange="toggleFloorStockDept(${i}, ${j}, '${esc(dep)}', this.checked)" /> ${esc(dep)}</label>`).join('')}</div>`;
                     return `
                     <div style="border:1px solid #cbd5e0; border-radius:8px; padding:12px; margin-bottom:10px; background:white;">
                         <div class="flex-between mb-2">
@@ -921,9 +953,24 @@ function renderDeptForm(d, i) {
                         </div>
                         <div class="form-group">
                             <label class="${fsRequired?'required':''}">Rooms / Beds / Care Areas serviced by this floor stock</label>
+                            <label class="check-row" style="margin-bottom:6px;"><input type="checkbox" ${fs.allRooms?'checked':''} onchange="setFloorStockAllRooms(${i}, ${j}, this.checked)" /> All rooms on this floor</label>
                             ${roomsBlock}
                             <input type="text" data-fs-other-rooms="dept-${i}-fs-${j}" value="${esc(fs.otherRooms||'')}" oninput="surveyDepts[${i}].floorStocks[${j}].otherRooms=this.value" onchange="surveyDepts[${i}].floorStocks[${j}].otherRooms=this.value" placeholder="Other care areas / hallways — free text" style="margin-top:6px;" />
                         </div>
+                        <div class="form-group">
+                            <label class="${fsRequired?'required':''}">Is this floor stock's medication inventory shared with other departments?</label>
+                            <div class="radio-group" data-fs-shared="dept-${i}-fs-${j}">
+                                <label><input type="radio" name="fsshared-${i}-${j}" value="Yes" ${fs.shared==='Yes'?'checked':''} onchange="setFloorStockShared(${i}, ${j}, 'Yes')" /> Yes</label>
+                                <label><input type="radio" name="fsshared-${i}-${j}" value="No" ${fs.shared==='No'?'checked':''} onchange="setFloorStockShared(${i}, ${j}, 'No')" /> No</label>
+                            </div>
+                        </div>
+                        ${fs.shared==='Yes' ? `
+                        <div class="form-group">
+                            <label class="required">Other departments serviced by this floor stock <span style="font-weight:normal; color:#4a5568;">(e.g. adjacent ICUs, step-down units, med/surg units)</span></label>
+                            <label class="check-row" style="margin-bottom:6px;"><input type="checkbox" ${fs.allDepts?'checked':''} onchange="setFloorStockAllDepts(${i}, ${j}, this.checked)" /> All departments in this hospital</label>
+                            ${deptsBlock}
+                            <input type="text" data-fs-other-depts="dept-${i}-fs-${j}" value="${esc(fs.otherDepts||'')}" oninput="surveyDepts[${i}].floorStocks[${j}].otherDepts=this.value" onchange="surveyDepts[${i}].floorStocks[${j}].otherDepts=this.value" placeholder="Other departments not listed above — free text" style="margin-top:6px;" />
+                        </div>` : ''}
                     </div>`;
                 }).join('')}
                 <button type="button" class="btn btn-secondary btn-sm" onclick="addFloorStock(${i})" style="margin-top:4px;">+ Add Floor Stock</button>
@@ -1019,13 +1066,20 @@ function validateSurvey() {
             const otGroup = document.querySelector(`[data-orderTime="dept-${i}"]`);
             if (otGroup) { otGroup.style.border = ''; otGroup.style.borderRadius = ''; otGroup.style.padding = '4px 0'; }
         }
-        // Floor stocks: if name is filled in, both Remote Managed and Rooms are required
+        // Floor stocks: if name is filled in, Remote Managed, Rooms, and the
+        // shared-with-other-departments answer are required (plus the departments
+        // list when the floor stock is shared).
         (d.floorStocks || []).forEach((fs, j) => {
             const remoteGroup = document.querySelector(`[data-fs-remote="dept-${i}-fs-${j}"]`);
             const roomsBox = document.querySelector(`[data-fs-rooms="dept-${i}-fs-${j}"]`);
             const otherRoomsInput = document.querySelector(`[data-fs-other-rooms="dept-${i}-fs-${j}"]`);
+            const sharedGroup = document.querySelector(`[data-fs-shared="dept-${i}-fs-${j}"]`);
+            const deptsBox = document.querySelector(`[data-fs-depts="dept-${i}-fs-${j}"]`);
+            const otherDeptsInput = document.querySelector(`[data-fs-other-depts="dept-${i}-fs-${j}"]`);
             const clearBorder = el => { if (el) { el.style.border = ''; el.style.borderRadius = ''; el.style.padding = ''; } };
-            clearBorder(remoteGroup); clearBorder(roomsBox); if (otherRoomsInput) otherRoomsInput.classList.remove('field-error');
+            clearBorder(remoteGroup); clearBorder(roomsBox); clearBorder(sharedGroup); clearBorder(deptsBox);
+            if (otherRoomsInput) otherRoomsInput.classList.remove('field-error');
+            if (otherDeptsInput) otherDeptsInput.classList.remove('field-error');
             if (!fs.name || !fs.name.trim()) return;
             if (!fs.remoteManaged || !fs.remoteManaged.trim()) {
                 if (remoteGroup) { remoteGroup.style.border = '2px solid #e53e3e'; remoteGroup.style.borderRadius = '6px'; remoteGroup.style.padding = '4px 8px'; }
@@ -1033,10 +1087,22 @@ function validateSurvey() {
             }
             const hasRoomPick = Array.isArray(fs.rooms) && fs.rooms.length > 0;
             const hasOtherRooms = fs.otherRooms && fs.otherRooms.trim();
-            if (!hasRoomPick && !hasOtherRooms) {
+            if (!fs.allRooms && !hasRoomPick && !hasOtherRooms) {
                 if (roomsBox) { roomsBox.style.border = '2px solid #e53e3e'; roomsBox.style.borderRadius = '6px'; }
                 if (otherRoomsInput) otherRoomsInput.classList.add('field-error');
-                errors.push(`Department ${i+1}, Floor Stock ${j+1}: select at least one room or fill in the free-text box.`);
+                errors.push(`Department ${i+1}, Floor Stock ${j+1}: select "all rooms on this floor", at least one room, or fill in the free-text box.`);
+            }
+            if (!fs.shared || !fs.shared.trim()) {
+                if (sharedGroup) { sharedGroup.style.border = '2px solid #e53e3e'; sharedGroup.style.borderRadius = '6px'; sharedGroup.style.padding = '4px 8px'; }
+                errors.push(`Department ${i+1}, Floor Stock ${j+1}: select whether its inventory is shared with other departments.`);
+            } else if (fs.shared === 'Yes') {
+                const hasDeptPick = Array.isArray(fs.depts) && fs.depts.length > 0;
+                const hasOtherDepts = fs.otherDepts && fs.otherDepts.trim();
+                if (!fs.allDepts && !hasDeptPick && !hasOtherDepts) {
+                    if (deptsBox) { deptsBox.style.border = '2px solid #e53e3e'; deptsBox.style.borderRadius = '6px'; }
+                    if (otherDeptsInput) otherDeptsInput.classList.add('field-error');
+                    errors.push(`Department ${i+1}, Floor Stock ${j+1}: select "all departments in this hospital", at least one department, or fill in the free-text box.`);
+                }
             }
         });
     });
