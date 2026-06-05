@@ -919,7 +919,7 @@ function renderDeptForm(d, i) {
             </div>
             <div class="form-group">
                 <label>List med floor stocks dispensing to this department and the respective Rooms/Beds/Care Areas/Departments they service.</label>
-                <div class="lock-callout">For each floor stock: enter the name, indicate whether it is <strong>remote managed</strong>, and select the rooms / beds / care areas it services. Use the free-text box for any care areas or hallways not in the room list.</div>
+                <div class="lock-callout">For each floor stock: enter the name and select the rooms / beds / care areas it services. Use the free-text box for any care areas or hallways not in the room list.</div>
                 ${(d.floorStocks || []).map((fs, j) => {
                     const rooms = getRoomsForDept(d.region, d.department);
                     const fsRequired = !!(fs.name && fs.name.trim());
@@ -927,10 +927,10 @@ function renderDeptForm(d, i) {
                     const roomsBlock = rooms.length === 0
                         ? `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">No rooms on file for this department — list every room/care area in the free-text box below.</div>`
                         : `<div class="multi-select" data-fs-rooms="dept-${i}-fs-${j}" style="max-height:200px;${roomsDisabled?'opacity:0.45;pointer-events:none;':''}">${rooms.map(r => `<label><input type="checkbox" ${(fs.rooms||[]).includes(r)?'checked':''} ${roomsDisabled?'disabled':''} onchange="toggleFloorStockRoom(${i}, ${j}, '${esc(r)}', this.checked)" /> ${esc(r)}</label>`).join('')}</div>`;
-                    const otherDepts = getDeptsInSameCityForLocation(d.region, d.location, d.department);
+                    const otherDepts = getDepartmentsForLocation(d.region, d.location).filter(dep => dep !== d.department);
                     const deptsDisabled = !!fs.allDepts;
                     const deptsBlock = otherDepts.length === 0
-                        ? `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">No other departments on file for this hospital — list every department in the free-text box below.</div>`
+                        ? `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">No other departments on file for this location — list every department in the free-text box below.</div>`
                         : `<div class="multi-select" data-fs-depts="dept-${i}-fs-${j}" style="max-height:200px;${deptsDisabled?'opacity:0.45;pointer-events:none;':''}">${otherDepts.map(dep => `<label><input type="checkbox" ${(fs.depts||[]).includes(dep)?'checked':''} ${deptsDisabled?'disabled':''} onchange="toggleFloorStockDept(${i}, ${j}, '${esc(dep)}', this.checked)" /> ${esc(dep)}</label>`).join('')}</div>`;
                     return `
                     <div style="border:1px solid #cbd5e0; border-radius:8px; padding:12px; margin-bottom:10px; background:white;">
@@ -938,18 +938,9 @@ function renderDeptForm(d, i) {
                             <strong style="color:#003B71;">Floor Stock ${j+1}</strong>
                             <button type="button" class="btn btn-danger btn-sm" onclick="removeFloorStock(${i}, ${j})">Remove</button>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Floor Stock Name</label>
-                                <input type="text" value="${esc(fs.name||'')}" oninput="surveyDepts[${i}].floorStocks[${j}].name=this.value" onchange="handleFloorStockNameChange(${i}, ${j}, this.value)" placeholder="e.g., Pharmacy Floor Stock, Materials Management FS" />
-                            </div>
-                            <div class="form-group">
-                                <label class="${fsRequired?'required':''}">Is this floor stock remote managed?</label>
-                                <div class="radio-group" data-fs-remote="dept-${i}-fs-${j}">
-                                    <label><input type="radio" name="fsremote-${i}-${j}" value="Yes" ${fs.remoteManaged==='Yes'?'checked':''} onchange="surveyDepts[${i}].floorStocks[${j}].remoteManaged='Yes'" /> Yes</label>
-                                    <label><input type="radio" name="fsremote-${i}-${j}" value="No" ${fs.remoteManaged==='No'?'checked':''} onchange="surveyDepts[${i}].floorStocks[${j}].remoteManaged='No'" /> No</label>
-                                </div>
-                            </div>
+                        <div class="form-group">
+                            <label>Floor Stock Name</label>
+                            <input type="text" value="${esc(fs.name||'')}" oninput="surveyDepts[${i}].floorStocks[${j}].name=this.value" onchange="handleFloorStockNameChange(${i}, ${j}, this.value)" placeholder="e.g., Pharmacy Floor Stock, Materials Management FS" />
                         </div>
                         <div class="form-group">
                             <label class="${fsRequired?'required':''}">Rooms / Beds / Care Areas serviced by this floor stock</label>
@@ -1066,25 +1057,19 @@ function validateSurvey() {
             const otGroup = document.querySelector(`[data-orderTime="dept-${i}"]`);
             if (otGroup) { otGroup.style.border = ''; otGroup.style.borderRadius = ''; otGroup.style.padding = '4px 0'; }
         }
-        // Floor stocks: if name is filled in, Remote Managed, Rooms, and the
-        // shared-with-other-departments answer are required (plus the departments
-        // list when the floor stock is shared).
+        // Floor stocks: if name is filled in, Rooms and the shared-with-other-departments
+        // answer are required (plus the departments list when the floor stock is shared).
         (d.floorStocks || []).forEach((fs, j) => {
-            const remoteGroup = document.querySelector(`[data-fs-remote="dept-${i}-fs-${j}"]`);
             const roomsBox = document.querySelector(`[data-fs-rooms="dept-${i}-fs-${j}"]`);
             const otherRoomsInput = document.querySelector(`[data-fs-other-rooms="dept-${i}-fs-${j}"]`);
             const sharedGroup = document.querySelector(`[data-fs-shared="dept-${i}-fs-${j}"]`);
             const deptsBox = document.querySelector(`[data-fs-depts="dept-${i}-fs-${j}"]`);
             const otherDeptsInput = document.querySelector(`[data-fs-other-depts="dept-${i}-fs-${j}"]`);
             const clearBorder = el => { if (el) { el.style.border = ''; el.style.borderRadius = ''; el.style.padding = ''; } };
-            clearBorder(remoteGroup); clearBorder(roomsBox); clearBorder(sharedGroup); clearBorder(deptsBox);
+            clearBorder(roomsBox); clearBorder(sharedGroup); clearBorder(deptsBox);
             if (otherRoomsInput) otherRoomsInput.classList.remove('field-error');
             if (otherDeptsInput) otherDeptsInput.classList.remove('field-error');
             if (!fs.name || !fs.name.trim()) return;
-            if (!fs.remoteManaged || !fs.remoteManaged.trim()) {
-                if (remoteGroup) { remoteGroup.style.border = '2px solid #e53e3e'; remoteGroup.style.borderRadius = '6px'; remoteGroup.style.padding = '4px 8px'; }
-                errors.push(`Department ${i+1}, Floor Stock ${j+1}: select whether it is remote managed.`);
-            }
             const hasRoomPick = Array.isArray(fs.rooms) && fs.rooms.length > 0;
             const hasOtherRooms = fs.otherRooms && fs.otherRooms.trim();
             if (!fs.allRooms && !hasRoomPick && !hasOtherRooms) {
