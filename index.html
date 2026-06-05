@@ -938,7 +938,7 @@ function renderDeptForm(d, i) {
                     const deptsDisabled = !!fs.allDepts;
                     const deptsBlock = otherDepts.length === 0
                         ? `<div class="text-muted" style="padding:8px 12px; background:#f7fafc; border:1px dashed #cbd5e0; border-radius:6px;">No other departments on file for this location — list every department in the free-text box below.</div>`
-                        : `<div class="multi-select" data-fs-depts="dept-${i}-fs-${j}" style="max-height:200px;${deptsDisabled?'opacity:0.45;pointer-events:none;':''}">${otherDepts.map(dep => `<label><input type="checkbox" ${(fs.depts||[]).includes(dep)?'checked':''} ${deptsDisabled?'disabled':''} onchange="toggleFloorStockDept(${i}, ${j}, '${esc(dep)}', this.checked)" /> ${esc(dep)}</label>`).join('')}</div>`;
+                        : `<div class="multi-select" data-fs-depts="dept-${i}-fs-${j}" style="max-height:200px;${deptsDisabled?'opacity:0.45;pointer-events:none;':''}">${otherDepts.map(dep => { const entry = `${dep} — ${d.location}`; return `<label><input type="checkbox" ${(fs.depts||[]).includes(entry)?'checked':''} ${deptsDisabled?'disabled':''} onchange="toggleFloorStockDept(${i}, ${j}, '${esc(entry)}', this.checked)" /> ${esc(entry)}</label>`; }).join('')}</div>`;
                     return `
                     <div style="border:1px solid #cbd5e0; border-radius:8px; padding:12px; margin-bottom:10px; background:white;">
                         <div class="flex-between mb-2">
