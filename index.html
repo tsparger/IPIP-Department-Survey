@@ -162,6 +162,13 @@
         <p class="text-muted mb-2">All survey submissions are stored in the SharePoint "IPIP Responses" list. Open the list to view, filter, sort, or export responses.</p>
         <a href="https://epic1.sharepoint.com/sites/Cust-KaiserPermanenteNational/Lists/IPIP%20Responses" target="_blank" class="btn btn-primary">Open SharePoint Responses List</a>
     </div>
+
+    <div class="card">
+        <h2>Local Progress (this browser only)</h2>
+        <p class="text-muted mb-2">The green "reviewed" checkmarks and saved partial drafts are cached in <strong>this browser</strong>, separate from SharePoint. If you cleared the SharePoint list but departments still show as reviewed here, reset the local cache below. This only affects this browser/device — respondents are not impacted.</p>
+        <button class="btn btn-danger" onclick="resetLocalProgress()">Reset My Local Progress</button>
+        <p id="local-progress-status" class="text-muted mt-2"></p>
+    </div>
 </div>
 
 <!-- ======================== SURVEY VIEW ======================== -->
@@ -1180,6 +1187,16 @@ function checkAdmin() {
     if (params.has('admin')) {
         document.getElementById('nav-admin').classList.remove('hidden');
     }
+}
+// Clears the per-browser completion cache (green checkmarks) and saved partial drafts.
+// Does not touch SharePoint or other users — local to this device only.
+function resetLocalProgress() {
+    if (!confirm('Reset locally-cached progress on THIS browser?\n\nThis clears the green "reviewed" checkmarks and any saved partial drafts stored in this browser. It does NOT change SharePoint or affect other respondents.')) return;
+    localStorage.removeItem('ipip-completed');
+    localStorage.removeItem('ipip-pending-drafts');
+    const el = document.getElementById('local-progress-status');
+    if (el) { el.textContent = 'Local progress cleared on this browser. Reloading…'; el.className = 'completion-hint completion-done mt-2'; }
+    setTimeout(() => location.reload(), 700);
 }
 
 // ============ INIT ============
