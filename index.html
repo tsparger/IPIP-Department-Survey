@@ -286,11 +286,28 @@ function describeError(err) {
     return String(err);
 }
 
-function toast(msg, isError) {
+// Recognizes the Power Automate gateway "didn't respond in time" class of errors
+// (NoResponse / upstream timeout / our own fetch abort). These are transient or
+// duration-related, not data problems, so we show actionable guidance instead.
+function isGatewayTimeout(msg) {
+    const s = String(msg || '').toLowerCase();
+    return s.includes('noresponse') || s.includes('upstream server')
+        || s.includes('did not receive a response') || s.includes('gateway')
+        || s.includes('timeout') || s.includes('timed out') || s.includes('aborted')
+        || s.includes('504');
+}
+// Friendly text for a timeout. We deliberately do NOT tell users to rely on the green
+// check — a re-submission of an already-completed entry shows the check even if this
+// attempt failed. Instead we reassure that resubmitting is safe, because the system
+// always keeps the most recent submission for each department (newest wins).
+const TIMEOUT_TOAST = 'The server took too long to respond, so this submission may not have gone through. Please wait a moment and click Submit again — it is safe to resubmit, because the most recent submission for each department is the one that is kept. If this keeps happening, let the survey administrator know.';
+
+function toast(msg, isError, ms) {
     const t = document.getElementById('toast');
     t.textContent = msg; t.style.display = 'block';
     t.className = isError ? 'toast toast-error' : 'toast';
-    setTimeout(() => t.style.display = 'none', 3500);
+    if (toast._timer) clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => t.style.display = 'none', ms || 3500);
 }
 
 // ============ SETUP ============
@@ -1148,11 +1165,14 @@ async function submitSurvey() {
                 clearActiveDraft();
                 showSuccessScreen(nameVal, now, surveyDepts.length);
             } else {
-                toast('Submission failed: ' + describeError(result), true);
+                const raw = describeError(result);
+                toast(isGatewayTimeout(raw) ? TIMEOUT_TOAST : ('Submission failed: ' + raw), true, isGatewayTimeout(raw) ? 11000 : 3500);
                 document.getElementById('submit-btn').disabled = false;
             }
         } catch (e) {
-            toast('Submission error: ' + describeError(e && (e.message || e)), true);
+            const raw = describeError(e && (e.message || e));
+            const timeout = isGatewayTimeout(raw) || (e && e.name === 'AbortError');
+            toast(timeout ? TIMEOUT_TOAST : ('Submission error: ' + raw), true, timeout ? 11000 : 3500);
             document.getElementById('submit-btn').disabled = false;
         }
         hideLoading();
