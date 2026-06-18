@@ -269,6 +269,23 @@ async function flowPost(url, data, timeoutMs) {
     } finally { clearTimeout(timeout); }
 }
 
+// Turns whatever the flow/network hands back into a readable message.
+// Power Automate failures come back as { error: { code, message } }, so a naive
+// string concat would surface "[object Object]" and hide the real cause.
+function describeError(err) {
+    if (err == null) return 'Unknown error';
+    if (typeof err === 'string') return err;
+    if (typeof err === 'object') {
+        const inner = err.error != null ? err.error : err;
+        if (typeof inner === 'string') return inner;
+        if (inner && (inner.message || inner.code)) {
+            return [inner.code, inner.message].filter(Boolean).join(': ');
+        }
+        try { return JSON.stringify(err); } catch (_) { return String(err); }
+    }
+    return String(err);
+}
+
 function toast(msg, isError) {
     const t = document.getElementById('toast');
     t.textContent = msg; t.style.display = 'block';
@@ -1125,17 +1142,17 @@ async function submitSurvey() {
         document.getElementById('submit-btn').disabled = true;
         try {
             const result = await flowPost(URLS.submit, data);
-            if (result.success) {
+            if (result && result.success) {
                 markCompleted(surveyDepts);
                 savePendingDrafts(surveyDepts);
                 clearActiveDraft();
                 showSuccessScreen(nameVal, now, surveyDepts.length);
             } else {
-                toast('Submission failed: ' + (result.error || 'Unknown error'), true);
+                toast('Submission failed: ' + describeError(result), true);
                 document.getElementById('submit-btn').disabled = false;
             }
         } catch (e) {
-            toast('Submission error: ' + e.message, true);
+            toast('Submission error: ' + describeError(e && (e.message || e)), true);
             document.getElementById('submit-btn').disabled = false;
         }
         hideLoading();
