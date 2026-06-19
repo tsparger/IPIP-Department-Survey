@@ -916,7 +916,7 @@ function renderDeptForm(d, i) {
                         <label><input type="radio" name="dispLogic-${i}" value="No" ${d.dispenseLogicCorrect==='No'?'checked':''} onchange="handleDispLogicChange(${i},'No')" /> No</label>
                     </div>
                 </div>
-                <div class="form-group"><label class="${d.dispenseLogicCorrect==='No'?'required':''}">List missing/additional dispensing locations to be added to Dispense Logic Hierarchy, and describe any considerations to this location (e.g. Pyxis machines, Satellite pharmacies, Floor stocks)</label>
+                <div class="form-group"><label class="${d.dispenseLogicCorrect==='No'?'required':''}">List missing/additional dispensing locations and <span style="background:#fff3cd; font-weight:700; text-decoration:underline;">Ambulatory Surgery Center servicing pharmacies</span> to be added to Dispense Logic Hierarchy, and describe any considerations to this location (e.g. Pyxis machines, Satellite pharmacies, Floor stocks, <span style="background:#fff3cd; font-weight:700; text-decoration:underline;">Ambulatory Surgery Center servicing pharmacies</span>)</label>
                     <textarea ${d.dispenseLogicCorrect==='No'?`data-req="dept-${i}"`:''} ${d.dispenseLogicCorrect==='No'?onch(i,'correctDispenseLogic'):''} class="${d.dispenseLogicCorrect==='No'?'':'disabled-field'}" ${d.dispenseLogicCorrect==='No'?'':'readonly'} placeholder="${d.dispenseLogicCorrect==='No'?'e.g., PACU 2 Pyxis — only narcotics are dispensed here, ...':'Select No above to enable this field'}">${esc(d.correctDispenseLogic)}</textarea>
                 </div>
             </div>
