@@ -844,7 +844,7 @@ function renderDeptForm(d, i) {
                 </div>
                 <div class="form-group">
                     <label class="required">Location</label>
-                    <input type="text" data-req="dept-${i}" list="loc-list-${i}" value="${esc(d.location)}" ${!d.region?'disabled':''} placeholder="${d.region?'Type to search or click the arrow':'Select Region first'}" oninput="handleLocationChange(${i}, this.value)" onchange="handleLocationChange(${i}, this.value)" />
+                    <input type="text" data-req="dept-${i}" list="loc-list-${i}" value="${esc(d.location)}" ${!d.region?'disabled':''} placeholder="${d.region?'Type to search or click the arrow':'Select Region first'}" onchange="handleLocationChange(${i}, this.value)" />
                     ${d.region ? `<datalist id="loc-list-${i}">${getLocationsForRegion(d.region).map(loc => {
                         const prefix = isLocationCompleted(d.region, loc) ? '✅ ' : '';
                         return `<option value="${esc(prefix + loc)}"></option>`;
@@ -853,7 +853,7 @@ function renderDeptForm(d, i) {
                 </div>
                 <div class="form-group">
                     <label class="required">Department</label>
-                    <input type="text" data-req="dept-${i}" list="dept-list-${i}" value="${esc(d.department)}" ${(!d.region || !d.location)?'disabled':''} placeholder="${(d.region && d.location)?'Type to search or click the arrow':'Select Location first'}" oninput="handleDepartmentChange(${i}, this.value)" onchange="handleDepartmentChange(${i}, this.value)" />
+                    <input type="text" data-req="dept-${i}" list="dept-list-${i}" value="${esc(d.department)}" ${(!d.region || !d.location)?'disabled':''} placeholder="${(d.region && d.location)?'Type to search or click the arrow':'Select Location first'}" onchange="handleDepartmentChange(${i}, this.value)" />
                     ${(d.region && d.location) ? (() => {
                         const depts = getDepartmentsForLocation(d.region, d.location);
                         if (depts.length === 0) {
