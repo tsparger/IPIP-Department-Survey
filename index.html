@@ -687,6 +687,32 @@ function isLocationCompleted(region, location) {
     if (!all.length) return false;
     return all.every(dep => isDeptCompleted(region, location, dep));
 }
+
+// ===== Free-text "Other" locations/departments as first-class dropdown entries =====
+// Surfaces previously-submitted entries that aren't in the master data (typed-in
+// "Other" locations/departments, from anyone via remote sync) so they reappear in the
+// datalists with a checkmark and can be re-picked to restore — instead of users
+// re-keying them and creating duplicates every time.
+function getOtherLocations(region) {
+    if (!region) return [];
+    const master = new Set(getLocationsForRegion(region));
+    const set = new Set();
+    [getCompleted(), remoteCompleted].forEach(mo => Object.keys(mo).forEach(k => { const p = k.split('||'); if (p[0] === region && p[1]) set.add(p[1]); }));
+    Object.keys(getPendingDrafts()).forEach(k => { const p = k.split('||'); if (p[0] === region && p[1]) set.add(p[1]); });
+    return [...set].filter(l => l && !master.has(l)).sort();
+}
+function getOtherDepartments(region, location) {
+    if (!region || !location) return [];
+    const master = new Set(getDepartmentsForLocation(region, location));
+    const set = new Set();
+    [getCompleted(), remoteCompleted].forEach(mo => (mo[`${region}||${location}`] || []).forEach(dep => set.add(dep)));
+    Object.keys(getPendingDrafts()).forEach(k => { const p = k.split('||'); if (p[0] === region && p[1] === location && p[2]) set.add(p[2]); });
+    return [...set].filter(dep => dep && !master.has(dep)).sort();
+}
+function locationHasCompletion(region, location) {
+    const key = `${region}||${location}`;
+    return (getCompleted()[key] || []).length > 0 || (remoteCompleted[key] || []).length > 0;
+}
 function locationStatus(region, location) {
     if (!region || !location) return '';
     const all = getDepartmentsForLocation(region, location);
@@ -848,6 +874,9 @@ function renderDeptForm(d, i) {
                     ${d.region ? `<datalist id="loc-list-${i}">${getLocationsForRegion(d.region).map(loc => {
                         const prefix = isLocationCompleted(d.region, loc) ? '✅ ' : '';
                         return `<option value="${esc(prefix + loc)}"></option>`;
+                    }).join('')}${getOtherLocations(d.region).map(loc => {
+                        const prefix = locationHasCompletion(d.region, loc) ? '✅ ' : '';
+                        return `<option value="${esc(prefix + loc)}"></option>`;
                     }).join('')}</datalist>` : ''}
                     ${locationStatus(d.region, d.location)}
                 </div>
@@ -855,7 +884,7 @@ function renderDeptForm(d, i) {
                     <label class="required">Department</label>
                     <input type="text" data-req="dept-${i}" list="dept-list-${i}" value="${esc(d.department)}" ${(!d.region || !d.location)?'disabled':''} placeholder="${(d.region && d.location)?'Type to search or click the arrow':'Select Location first'}" onchange="handleDepartmentChange(${i}, this.value)" />
                     ${(d.region && d.location) ? (() => {
-                        const depts = getDepartmentsForLocation(d.region, d.location);
+                        const depts = [...getDepartmentsForLocation(d.region, d.location), ...getOtherDepartments(d.region, d.location)];
                         if (depts.length === 0) {
                             return `<div class="completion-hint completion-partial">⚠ No departments available in the dropdown for this location. The location string may be from an outdated draft — try clearing this field and re-picking from the Location dropdown. If the issue persists, contact the survey administrator.</div>`;
                         }
