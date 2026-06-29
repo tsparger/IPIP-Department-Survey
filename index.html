@@ -118,7 +118,7 @@
             .form-row, .form-row-3, .form-row-4 { grid-template-columns: 1fr; }
         }
     </style>
-    <script src="survey-data.js?v=20260625pass"></script>
+    <script src="survey-data.js?v=20260629dept"></script>
 </head>
 <body>
 
@@ -403,15 +403,35 @@ function getDeptRow(region, location, department) {
     if (!data || !data.departments || !data.departments[region] || !data.departments[region][location]) return null;
     return data.departments[region][location].find(d => d.dept === department) || null;
 }
-function getMainPharmacies() {
+// Classify a pharmacy into its KP region by its OneLink location-code prefix:
+// 2 = NCAL, 8 = SCAL, 10 = NW, 12 or 36 = HI.
+function pharmacyRegion(name) {
+    const data = _data();
+    const r = (data && data.onelink && data.onelink.byPharmacy && data.onelink.byPharmacy[name]) || {};
+    const c = String(r.locCode || r.rxLocCode || '');
+    if (c.startsWith('2')) return 'NCAL';
+    if (c.startsWith('8')) return 'SCAL';
+    if (c.startsWith('10')) return 'NW';
+    if (c.startsWith('12') || c.startsWith('36')) return 'HI';
+    return null;
+}
+function getMainPharmacies(region) {
     const data = _data();
     if (!data || !data.onelink || !data.onelink.pharmacies) return [];
-    return [...data.onelink.pharmacies].sort();
+    let list = [...data.onelink.pharmacies];
+    // Limit the dropdown to pharmacies in the department's region (by location code).
+    if (region) list = list.filter(p => pharmacyRegion(p) === region);
+    return list.sort();
 }
 function getPharmacyRow(pharmacy) {
     const data = _data();
     if (!data || !data.onelink || !data.onelink.byPharmacy) return null;
     return data.onelink.byPharmacy[pharmacy] || null;
+}
+// A department's detail fields are all optional (and required asterisks hidden) when it's
+// out of scope for IPIP, or when the MOBI answer is "Yes" or "Unknown".
+function isDeptOptional(d) {
+    return d.onelinkNotInScope || d.mobiReviewed === 'Yes' || d.mobiReviewed === 'Unknown';
 }
 function handleNumPyxisChange(i, value) {
     const prev = parseInt(surveyDepts[i].numPyxis || '0', 10);
@@ -854,7 +874,7 @@ function renderDeptForm(d, i) {
     if (typeof d.orderTime === 'string') d.orderTime = d.orderTime ? [d.orderTime] : [];
 
     return `
-    <div class="dept-entry${d.onelinkNotInScope ? ' optional-mode' : ''}">
+    <div class="dept-entry${isDeptOptional(d) ? ' optional-mode' : ''}">
         <div class="dept-header">
             <h3>Department ${i + 1}</h3>
             ${surveyDepts.length > 1 ? `<button class="btn btn-danger" onclick="surveyDepts.splice(${i},1);renderSurvey()">Remove Department</button>` : ''}
@@ -911,8 +931,15 @@ function renderDeptForm(d, i) {
             <div class="form-group">
                 <label class="required">Was this department a part of the Medical Office Building Inventory (MOBI) deployment?</label>
                 <div class="radio-group" data-req-radio="dept-${i}" data-field="mobi-${i}">
-                    <label><input type="radio" name="mobi-${i}" value="Yes" ${d.mobiReviewed==='Yes'?'checked':''} onchange="${sd(i,'mobiReviewed')}=this.value" /> Yes</label>
-                    <label><input type="radio" name="mobi-${i}" value="No" ${d.mobiReviewed==='No'?'checked':''} onchange="${sd(i,'mobiReviewed')}=this.value" /> No</label>
+                    <label><input type="radio" name="mobi-${i}" value="Yes" ${d.mobiReviewed==='Yes'?'checked':''} onchange="surveyDepts[${i}].mobiReviewed=this.value;renderSurvey()" /> Yes</label>
+                    <label><input type="radio" name="mobi-${i}" value="No" ${d.mobiReviewed==='No'?'checked':''} onchange="surveyDepts[${i}].mobiReviewed=this.value;renderSurvey()" /> No</label>
+                    <label><input type="radio" name="mobi-${i}" value="Unknown" ${d.mobiReviewed==='Unknown'?'checked':''} onchange="surveyDepts[${i}].mobiReviewed=this.value;renderSurvey()" /> Unknown</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="check-row" style="background:#fffbeb; border:1px solid #f6ad55;">
+                    <input type="checkbox" id="onelinkOOS-${i}" ${d.onelinkNotInScope?'checked':''} onchange="handleOnelinkScopeChange(${i}, this.checked)" />
+                    <label for="onelinkOOS-${i}"><strong>Check only if this department does NOT receive meds from Inpatient Pharmacy and does not need inpatient pharmacy medication inventory tracking (i.e. out of scope for IPIP)</strong></label>
                 </div>
             </div>
         </div>
@@ -923,7 +950,7 @@ function renderDeptForm(d, i) {
                 <div class="form-group">
                     <label class="required">Main Supplying Pharmacy</label>
                     <input type="text" data-req="dept-${i}" list="pharm-list-${i}" value="${esc(d.mainSupplyingPharmacy)}" placeholder="Type to search or click the arrow" onchange="handleMainPharmacyChange(${i}, this.value)" />
-                    <datalist id="pharm-list-${i}">${getMainPharmacies().map(p => `<option value="${esc(p)}"></option>`).join('')}</datalist>
+                    <datalist id="pharm-list-${i}">${getMainPharmacies(d.region).map(p => `<option value="${esc(p)}"></option>`).join('')}</datalist>
                     ${noPharmMapping && !d.mainSupplyingPharmacy ? `<div class="completion-hint completion-partial">⚠ No Main Supplying Pharmacy on file for this location yet — please select one manually. The OneLink fields below will auto-fill once you choose a pharmacy.</div>` : ''}
                 </div>
                 <div class="form-group">
@@ -955,11 +982,7 @@ function renderDeptForm(d, i) {
 
         <div class="section-header">OneLink Information</div>
         <div class="section-body">
-            <div class="check-row" style="background:#fffbeb; border:1px solid #f6ad55;">
-                <input type="checkbox" id="onelinkOOS-${i}" ${d.onelinkNotInScope?'checked':''} onchange="handleOnelinkScopeChange(${i}, this.checked)" />
-                <label for="onelinkOOS-${i}"><strong>Check only if this department does NOT receive meds from Inpatient Pharmacy and does not need inpatient pharmacy medication inventory tracking (i.e. out of scope for IPIP)</strong></label>
-            </div>
-            <p class="text-muted mb-2">${d.onelinkNotInScope ? 'OneLink fields are not required since the location is out of scope.' : 'All fields below auto-fill based on the Main Supplying Pharmacy selected above. You can edit them if needed.'}</p>
+            <p class="text-muted mb-2">${d.onelinkNotInScope ? 'OneLink fields are not required since the department is out of scope (see the checkbox under the MOBI question above).' : 'All fields below auto-fill based on the Main Supplying Pharmacy selected above. You can edit them if needed.'}</p>
             <div class="form-row-3">
                 <div class="form-group"><label class="${d.onelinkNotInScope?'':'required'}">OneLink Location Code Description</label><input type="text" class="${d.onelinkNotInScope?'disabled-field':'autofill-field'}" ${d.onelinkNotInScope?'readonly':`data-req="dept-${i}"`} value="${esc(d.onelinkLocDesc)}" ${onch(i,'onelinkLocDesc')} /></div>
                 <div class="form-group"><label class="${d.onelinkNotInScope?'':'required'}">OneLink Location Code</label><input type="text" class="${d.onelinkNotInScope?'disabled-field':'autofill-field'}" ${d.onelinkNotInScope?'readonly':`data-req="dept-${i}"`} value="${esc(d.onelinkLocCode)}" ${onch(i,'onelinkLocCode')} /></div>
@@ -976,10 +999,6 @@ function renderDeptForm(d, i) {
         <div class="section-body">
             <div class="form-group"><label>List NON-Profiled Pyxis Machines dispensing to this department</label>
                 <textarea ${onch(i,'otherPyxis')} placeholder="e.g., ICU1 IP RX PYXIS, ICU2 IP RX PYXIS, MEDSUG1 IP RX PYXIS, MEDSURG2 IP RX PYXIS, ...">${esc(d.otherPyxis)}</textarea>
-            </div>
-            <div class="form-group">
-                <label>List Crash Carts in this department</label>
-                <textarea ${onch(i,'crashCarts')} placeholder="e.g., ED BAY 1 Crash Cart, L&amp;D Room 1 Crash Cart, ...">${esc(d.crashCarts)}</textarea>
             </div>
             <div class="form-group">
                 <label>List med refrigerators dispensing to this department that are NOT managed by Remote Manager.</label>
@@ -1111,10 +1130,10 @@ function validateSurvey() {
     else { nameInput.classList.remove('field-error'); }
 
     surveyDepts.forEach((d, i) => {
-        // Out-of-scope departments (not serviced by Inpatient Pharmacy / no IPIP tracking)
-        // only need to identify themselves; every other question is optional. Clear any
-        // stale required highlighting and skip the rest of the checks for this department.
-        if (d.onelinkNotInScope) {
+        // Out-of-scope departments, and those answered MOBI = Yes/Unknown, only need to
+        // identify themselves; every other question is optional. Clear any stale required
+        // highlighting and skip the rest of the checks for this department.
+        if (isDeptOptional(d)) {
             document.querySelectorAll(`[data-req="dept-${i}"]`).forEach(el => el.classList.remove('field-error'));
             document.querySelectorAll(`[data-req-radio="dept-${i}"]`).forEach(rg => { rg.style.border=''; rg.style.borderRadius=''; rg.style.padding='4px 0'; });
             const otGroup = document.querySelector(`[data-orderTime="dept-${i}"]`);
