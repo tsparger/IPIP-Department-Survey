@@ -1109,6 +1109,18 @@ function validateSurvey() {
     else { nameInput.classList.remove('field-error'); }
 
     surveyDepts.forEach((d, i) => {
+        // Out-of-scope departments (not serviced by Inpatient Pharmacy / no IPIP tracking)
+        // only need to identify themselves; every other question is optional. Clear any
+        // stale required highlighting and skip the rest of the checks for this department.
+        if (d.onelinkNotInScope) {
+            document.querySelectorAll(`[data-req="dept-${i}"]`).forEach(el => el.classList.remove('field-error'));
+            document.querySelectorAll(`[data-req-radio="dept-${i}"]`).forEach(rg => { rg.style.border=''; rg.style.borderRadius=''; rg.style.padding='4px 0'; });
+            const otGroup = document.querySelector(`[data-orderTime="dept-${i}"]`);
+            if (otGroup) { otGroup.style.border=''; otGroup.style.borderRadius=''; otGroup.style.padding='4px 0'; }
+            if (!d.region || !d.location || !d.department) errors.push(`Department ${i+1}: Select Region, Location, and Department.`);
+            return; // all other fields optional for an out-of-scope department
+        }
+
         document.querySelectorAll(`[data-req="dept-${i}"]`).forEach(el => {
             if (!el.value.trim()) { el.classList.add('field-error'); errors.push(`Department ${i+1}: Missing required field.`); }
             else { el.classList.remove('field-error'); }
