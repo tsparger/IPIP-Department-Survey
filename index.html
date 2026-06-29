@@ -90,6 +90,8 @@
         .toast-error { background: #e53e3e; }
 
         .required::after { content: ' *'; color: #e53e3e; }
+        /* When a department is out of scope for IPIP, all fields are optional, so hide the required asterisks. */
+        .dept-entry.optional-mode .required::after { content: ''; }
         .completion-hint { font-size: 12px; padding: 4px 8px; border-radius: 4px; margin-top: 4px; background: #edf2f7; color: #4a5568; }
         .completion-done { background: #c6f6d5; color: #1c4532; font-weight: 600; }
         .completion-partial { background: #fefcbf; color: #5f370e; }
@@ -852,7 +854,7 @@ function renderDeptForm(d, i) {
     if (typeof d.orderTime === 'string') d.orderTime = d.orderTime ? [d.orderTime] : [];
 
     return `
-    <div class="dept-entry">
+    <div class="dept-entry${d.onelinkNotInScope ? ' optional-mode' : ''}">
         <div class="dept-header">
             <h3>Department ${i + 1}</h3>
             ${surveyDepts.length > 1 ? `<button class="btn btn-danger" onclick="surveyDepts.splice(${i},1);renderSurvey()">Remove Department</button>` : ''}
