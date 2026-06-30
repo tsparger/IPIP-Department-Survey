@@ -118,7 +118,7 @@
             .form-row, .form-row-3, .form-row-4 { grid-template-columns: 1fr; }
         }
     </style>
-    <script src="survey-data.js?v=20260629dept"></script>
+    <script src="survey-data.js?v=20260630dept"></script>
 </head>
 <body>
 
@@ -1030,8 +1030,9 @@ function renderDeptForm(d, i) {
                             <button type="button" class="btn btn-danger btn-sm" onclick="removeFloorStock(${i}, ${j})">Remove</button>
                         </div>
                         <div class="form-group">
-                            <label>Floor Stock Name</label>
-                            <input type="text" value="${esc(fs.name||'')}" oninput="surveyDepts[${i}].floorStocks[${j}].name=this.value" onchange="handleFloorStockNameChange(${i}, ${j}, this.value)" placeholder="e.g., Pharmacy Floor Stock, Materials Management FS" />
+                            <label>Pharmacy Floor Stock Name</label>
+                            <div class="text-muted" style="margin:0 0 6px;">Floor stock is a designated storage location with pharmacy-supplied medications that are not managed by Pyxis</div>
+                            <input type="text" value="${esc(fs.name||'')}" oninput="surveyDepts[${i}].floorStocks[${j}].name=this.value" onchange="handleFloorStockNameChange(${i}, ${j}, this.value)" placeholder="e.g., Pharmacy Floor Stock" />
                         </div>
                         <div class="form-group">
                             <label class="${fsRequired?'required':''}">Rooms / Beds / Care Areas serviced by this floor stock</label>
