@@ -1067,10 +1067,10 @@ function renderDeptForm(d, i) {
         <div class="section-header">Ordering Information</div>
         <div class="section-body">
             <div class="form-row-3">
-                <div class="form-group"><label class="required">What days does this Department place orders?</label><input type="text" data-req="dept-${i}" value="${esc(d.orderDays)}" ${onch(i,'orderDays')} placeholder="e.g., Mon-Fri, Daily, etc." /></div>
-                <div class="form-group"><label class="required">Order Frequency</label><input type="text" data-req="dept-${i}" value="${esc(d.orderFrequency)}" ${onch(i,'orderFrequency')} placeholder="e.g., Daily, Twice Daily, Weekly, Weekdays only, ..." /></div>
+                <div class="form-group"><label>What days does this Department place orders?</label><input type="text" value="${esc(d.orderDays)}" ${onch(i,'orderDays')} placeholder="e.g., Mon-Fri, Daily, etc." /></div>
+                <div class="form-group"><label>Order Frequency</label><input type="text" value="${esc(d.orderFrequency)}" ${onch(i,'orderFrequency')} placeholder="e.g., Daily, Twice Daily, Weekly, Weekdays only, ..." /></div>
                 <div class="form-group">
-                    <label class="required">Time of Day of Ordering (select all that apply)</label>
+                    <label>Time of Day of Ordering (select all that apply)</label>
                     <div class="radio-group" data-orderTime="dept-${i}">
                         <label><input type="checkbox" ${(d.orderTime||[]).includes('AM/Early Morning')?'checked':''} onchange="toggleMulti(${i},'orderTime','AM/Early Morning',this.checked)" /> AM/Early Morning</label>
                         <label><input type="checkbox" ${(d.orderTime||[]).includes('PM/Mid Afternoon')?'checked':''} onchange="toggleMulti(${i},'orderTime','PM/Mid Afternoon',this.checked)" /> PM/Mid Afternoon</label>
@@ -1153,14 +1153,7 @@ function validateSurvey() {
                 errors.push(`Department ${i+1}: A required selection is missing.`);
             } else { rg.style.border = ''; rg.style.borderRadius = ''; rg.style.padding = '4px 0'; }
         });
-        if (!Array.isArray(d.orderTime) || d.orderTime.length === 0) {
-            const otGroup = document.querySelector(`[data-orderTime="dept-${i}"]`);
-            if (otGroup) { otGroup.style.border = '2px solid #e53e3e'; otGroup.style.borderRadius = '6px'; otGroup.style.padding = '4px 8px'; }
-            errors.push(`Department ${i+1}: Select at least one Time of Day of Ordering.`);
-        } else {
-            const otGroup = document.querySelector(`[data-orderTime="dept-${i}"]`);
-            if (otGroup) { otGroup.style.border = ''; otGroup.style.borderRadius = ''; otGroup.style.padding = '4px 0'; }
-        }
+        // Ordering Information (order days, frequency, time of day) is optional — no validation.
         // Floor stocks: if name is filled in, Rooms and the shared-with-other-departments
         // answer are required (plus the departments list when the floor stock is shared).
         (d.floorStocks || []).forEach((fs, j) => {
