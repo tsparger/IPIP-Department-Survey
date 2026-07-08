@@ -617,13 +617,24 @@ function parseFloorStocks(raw) {
     });
 }
 
+// SharePoint "multiple lines of text" columns in rich-text mode wrap values in
+// <div class="ExternalClass...">...</div> and HTML-encode characters. Strip that so
+// restored answers read as clean plain text instead of HTML markup.
+function stripHtml(s) {
+    if (s == null) return s;
+    let t = String(s);
+    if (!/[<&]/.test(t)) return t;
+    t = t.replace(/<div[^>]*>/gi, '\n').replace(/<\/div>/gi, '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+    t = t.replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n)).replace(/&quot;/gi, '"').replace(/&#39;/gi, "'");
+    return t.replace(/\n{3,}/g, '\n\n').trim();
+}
 function mapRemoteRowToDept(d, row) {
     Object.keys(SP_FIELD_MAP).forEach(col => {
-        if (col in row && row[col] != null) d[SP_FIELD_MAP[col]] = String(row[col]);
+        if (col in row && row[col] != null) d[SP_FIELD_MAP[col]] = stripHtml(String(row[col]));
     });
     if ('OneLinkNotInScope' in row) d.onelinkNotInScope = (row.OneLinkNotInScope === 'Yes' || row.OneLinkNotInScope === true);
-    if (row.field_36) d.sharedDepts = String(row.field_36).split(';').map(s => s.trim()).filter(Boolean);  // SharedDepts
-    if (row.field_40) d.orderTime = String(row.field_40).split(';').map(s => s.trim()).filter(Boolean);    // OrderTime
+    if (row.field_36) d.sharedDepts = stripHtml(String(row.field_36)).split(';').map(s => s.trim()).filter(Boolean);  // SharedDepts
+    if (row.field_40) d.orderTime = stripHtml(String(row.field_40)).split(';').map(s => s.trim()).filter(Boolean);    // OrderTime
     if ('FloorStocks' in row) d.floorStocks = parseFloorStocks(row.FloorStocks);
 }
 
@@ -789,6 +800,32 @@ function handleRegionChange(i, value) {
     d.mainSupplyingPharmacy = '';
     renderSurvey();
 }
+// Live (per-keystroke / per-selection) updates that DON'T rebuild the whole form —
+// so the Location field keeps focus and its dropdown open, and the Department field
+// becomes usable immediately (fixes the "Department stays grayed out" glitch that
+// happened when we relied only on the change event, which datalists fire unreliably).
+function handleLocationInput(i, value) {
+    surveyDepts[i].location = value.replace(/^[✓✅]\s*/, '');
+    syncDeptField(i);
+}
+function handleDepartmentInput(i, value) {
+    surveyDepts[i].department = value.replace(/^[✓✅]\s*/, '');
+}
+// Enable/disable + repopulate the Department input's datalist in place based on the
+// current location, without a full renderSurvey() (avoids focus/dropdown loss).
+function syncDeptField(i) {
+    const d = surveyDepts[i];
+    const inp = document.getElementById(`dept-input-${i}`);
+    const dl = document.getElementById(`dept-list-${i}`);
+    if (!inp) return;
+    const enabled = !!(d.region && d.location);
+    inp.disabled = !enabled;
+    inp.placeholder = enabled ? 'Type to search or click the arrow' : 'Select Location first';
+    if (dl) {
+        const depts = enabled ? [...getDepartmentsForLocation(d.region, d.location), ...getOtherDepartments(d.region, d.location)] : [];
+        dl.innerHTML = depts.map(dep => { const p = isDeptCompleted(d.region, d.location, dep) ? '✅ ' : ''; return `<option value="${esc(p + dep)}"></option>`; }).join('');
+    }
+}
 function handleLocationChange(i, value) {
     value = value.replace(/^[✓✅]\s*/, '');
     const d = surveyDepts[i];
@@ -837,10 +874,13 @@ async function handleDepartmentChange(i, value) {
         const region = d.region, location = d.location, department = value;
         try {
             const row = await fetchDeptDetail(region, location, department);
-            // The fetch is async; only apply if this slot still holds the same
-            // department (guard against the user switching it mid-request).
-            if (row && surveyDepts[i] && surveyDepts[i].department === department) {
-                mapRemoteRowToDept(surveyDepts[i], row);
+            // The fetch is async; only apply if this exact slot STILL holds the same
+            // region + location + department (guard against the user switching or
+            // removing departments mid-request, which could otherwise write one
+            // department's responses onto another).
+            const s = surveyDepts[i];
+            if (row && s && s.region === region && s.location === location && s.department === department) {
+                mapRemoteRowToDept(s, row);
                 renderSurvey();
                 toast('Loaded previously submitted responses for this department.');
             }
@@ -892,7 +932,7 @@ function renderDeptForm(d, i) {
                 </div>
                 <div class="form-group">
                     <label class="required">Location</label>
-                    <input type="text" data-req="dept-${i}" list="loc-list-${i}" value="${esc(d.location)}" ${!d.region?'disabled':''} placeholder="${d.region?'Type to search or click the arrow':'Select Region first'}" onchange="handleLocationChange(${i}, this.value)" />
+                    <input type="text" data-req="dept-${i}" list="loc-list-${i}" value="${esc(d.location)}" ${!d.region?'disabled':''} placeholder="${d.region?'Type to search or click the arrow':'Select Region first'}" oninput="handleLocationInput(${i}, this.value)" onchange="handleLocationChange(${i}, this.value)" />
                     ${d.region ? `<datalist id="loc-list-${i}">${getLocationsForRegion(d.region).map(loc => {
                         const prefix = isLocationCompleted(d.region, loc) ? '✅ ' : '';
                         return `<option value="${esc(prefix + loc)}"></option>`;
@@ -904,17 +944,9 @@ function renderDeptForm(d, i) {
                 </div>
                 <div class="form-group">
                     <label class="required">Department</label>
-                    <input type="text" data-req="dept-${i}" list="dept-list-${i}" value="${esc(d.department)}" ${(!d.region || !d.location)?'disabled':''} placeholder="${(d.region && d.location)?'Type to search or click the arrow':'Select Location first'}" onchange="handleDepartmentChange(${i}, this.value)" />
-                    ${(d.region && d.location) ? (() => {
-                        const depts = [...getDepartmentsForLocation(d.region, d.location), ...getOtherDepartments(d.region, d.location)];
-                        if (depts.length === 0) {
-                            return `<div class="completion-hint completion-partial">⚠ No departments available in the dropdown for this location. The location string may be from an outdated draft — try clearing this field and re-picking from the Location dropdown. If the issue persists, contact the survey administrator.</div>`;
-                        }
-                        return `<datalist id="dept-list-${i}">${depts.map(dep => {
-                            const prefix = isDeptCompleted(d.region, d.location, dep) ? '✅ ' : '';
-                            return `<option value="${esc(prefix + dep)}"></option>`;
-                        }).join('')}</datalist>`;
-                    })() : ''}
+                    <input type="text" id="dept-input-${i}" data-req="dept-${i}" list="dept-list-${i}" value="${esc(d.department)}" ${(!d.region || !d.location)?'disabled':''} placeholder="${(d.region && d.location)?'Type to search or click the arrow':'Select Location first'}" oninput="handleDepartmentInput(${i}, this.value)" onchange="handleDepartmentChange(${i}, this.value)" />
+                    <datalist id="dept-list-${i}">${(d.region && d.location) ? [...getDepartmentsForLocation(d.region, d.location), ...getOtherDepartments(d.region, d.location)].map(dep => { const prefix = isDeptCompleted(d.region, d.location, dep) ? '✅ ' : ''; return `<option value="${esc(prefix + dep)}"></option>`; }).join('') : ''}</datalist>
+                    ${(d.region && d.location && getDepartmentsForLocation(d.region, d.location).length === 0 && getOtherDepartments(d.region, d.location).length === 0) ? `<div class="completion-hint completion-partial">⚠ No departments available in the dropdown for this location. Try clearing this field and re-picking from the Location dropdown. If the issue persists, contact the survey administrator.</div>` : ''}
                     ${departmentStatus(d.region, d.location, d.department)}
                 </div>
             </div>
