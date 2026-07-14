@@ -118,7 +118,7 @@
             .form-row, .form-row-3, .form-row-4 { grid-template-columns: 1fr; }
         }
     </style>
-    <script src="survey-data.js?v=20260701led"></script>
+    <script src="survey-data.js?v=20260714acah"></script>
 </head>
 <body>
 
@@ -638,6 +638,26 @@ function mapRemoteRowToDept(d, row) {
     if ('FloorStocks' in row) d.floorStocks = parseFloorStocks(row.FloorStocks);
 }
 
+// Guard against a detail row that isn't actually for the department we asked about.
+// The "Get Department Detail" flow is queried by region+location+department, but if it
+// ever matches too loosely (or returns a most-recent row for the wrong key), applying it
+// would stamp one department's answers onto another. So before mapping, require that any
+// identifier the row DOES expose matches the current selection. Region/Location/Department
+// come back either as friendly names or the CSV-import field_3/4/5 columns; region/location/
+// department are otherwise omitted from SP_FIELD_MAP, which is exactly why they were never
+// being validated. A row that exposes no identifiers at all can't be checked, so it's allowed.
+function normId(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
+function rowMatchesSelection(row, region, location, department) {
+    if (!row) return false;
+    const rReg  = row.Region     != null ? row.Region     : row.field_3;
+    const rLoc  = row.Location   != null ? row.Location   : row.field_4;
+    const rDept = row.Department != null ? row.Department : row.field_5;
+    if (rDept != null && normId(rDept) !== normId(department)) return false;
+    if (rLoc  != null && normId(rLoc)  !== normId(location))   return false;
+    if (rReg  != null && normId(rReg)  !== normId(region))     return false;
+    return true;
+}
+
 // Targeted, single-department lookup — keeps the payload to one row so it stays
 // well under the sync-trigger timeout that forced Flow 4 to slim down.
 async function fetchDeptDetail(region, location, department) {
@@ -879,7 +899,8 @@ async function handleDepartmentChange(i, value) {
             // removing departments mid-request, which could otherwise write one
             // department's responses onto another).
             const s = surveyDepts[i];
-            if (row && s && s.region === region && s.location === location && s.department === department) {
+            if (row && s && s.region === region && s.location === location && s.department === department
+                && rowMatchesSelection(row, region, location, department)) {
                 mapRemoteRowToDept(s, row);
                 renderSurvey();
                 toast('Loaded previously submitted responses for this department.');
@@ -1386,6 +1407,24 @@ function init() {
         surveyView.addEventListener('input', persistActiveDraftDebounced);
         surveyView.addEventListener('change', persistActiveDraftDebounced);
     }
+    // Flush the draft synchronously before the page goes away. The debounced autosave
+    // waits 400ms and text fields only commit to surveyDepts on their onchange (blur),
+    // so a refresh/close mid-edit could otherwise drop the most recent answers. Blurring
+    // the focused survey field first fires its onchange, committing that value into
+    // surveyDepts; then we persist immediately (not debounced). This is what makes
+    // "close the tab and finish later" actually reliable across a reload.
+    function flushActiveDraft() {
+        try {
+            const ae = document.activeElement;
+            if (ae && ae !== document.body && typeof ae.blur === 'function'
+                && surveyView && surveyView.contains(ae)) {
+                ae.blur();
+            }
+        } catch (e) {}
+        persistActiveDraft();
+    }
+    window.addEventListener('beforeunload', flushActiveDraft);
+    window.addEventListener('pagehide', flushActiveDraft);
     loadRemoteCompletions();
 
     if (isConnected()) {
